@@ -69,7 +69,7 @@
 69,Pueblo+de+bonificaci%C3%B3n,513,446,0,26,7
 70,Pueblo+de+bonificaci%C3%B3n,497,443,0,26,4
 71,pueblo+de+m.portugal,477,532,2059008,26,0
-72,Pueblo+de+bonificaci%C3%B3n,550,521,0,26,1
+72,Pueblo+de+bonificaci%C3%B3n,550,521,0,27,1
 73,Pueblo+de+bonificaci%C3%B3n,441,513,0,26,4
 74,pueblo+de+merlin9,470,536,1955107,26,0
 75,Pueblo+de+b%C3%A1rbaros,528,517,0,26,0
@@ -91,7 +91,7 @@
 91,Pueblo+de+bonificaci%C3%B3n,504,463,0,26,1
 92,Pueblo+de+bonificaci%C3%B3n,532,502,0,26,2
 93,pueblo+de+GeminisSaga,487,535,2179037,26,0
-94,Pueblo+de+bonificaci%C3%B3n,469,485,0,26,2
+94,Pueblo+de+bonificaci%C3%B3n,469,485,0,27,2
 95,Pueblo+de+bonificaci%C3%B3n,449,483,0,26,9
 96,pueblo+de+-.Kenny+McCormick.-,496,472,1998599,26,0
 97,Pueblo+de+bonificaci%C3%B3n,528,513,0,26,9
@@ -136,7 +136,7 @@
 136,Pueblo+de+b%C3%A1rbaros,553,474,0,26,0
 137,Pueblo+de+bonificaci%C3%B3n,528,503,0,26,4
 138,pueblo+de+traspie,513,497,1736828,26,0
-139,Pueblo+de+b%C3%A1rbaros,537,481,0,26,0
+139,Pueblo+de+b%C3%A1rbaros,537,481,0,32,0
 140,Pueblo+de+bonificaci%C3%B3n,475,451,0,26,8
 141,pueblo+de+GANZ,524,498,1608217,26,0
 142,Pueblo+de+b%C3%A1rbaros,500,560,0,26,0
@@ -220,7 +220,7 @@
 220,Pueblo+de+b%C3%A1rbaros,504,508,0,26,0
 221,Pueblo+de+bonificaci%C3%B3n,520,457,0,26,5
 222,pueblo+de+Oxygen,519,525,1958874,26,0
-223,Pueblo+de+b%C3%A1rbaros,500,490,0,26,0
+223,Pueblo+de+b%C3%A1rbaros,500,490,0,32,0
 224,Pueblo+de+bonificaci%C3%B3n,462,458,0,26,8
 225,Pueblo+de+bonificaci%C3%B3n,475,485,0,26,3
 226,pueblo+de+cucalascano,511,516,1961278,26,0
@@ -252,7 +252,7 @@
 252,pueblo+de+matimir,512,521,1652831,26,0
 253,Pueblo+de+b%C3%A1rbaros,460,514,0,26,0
 254,Pueblo+de+bonificaci%C3%B3n,480,513,0,26,3
-255,Pueblo+de+bonificaci%C3%B3n,543,481,0,26,4
+255,Pueblo+de+bonificaci%C3%B3n,543,481,0,38,4
 256,pueblo+de+Heidy,518,528,2023202,26,0
 257,Pueblo+de+bonificaci%C3%B3n,514,519,0,26,8
 258,Pueblo+de+bonificaci%C3%B3n,548,476,0,26,1
@@ -296,7 +296,7 @@
 296,Pueblo+de+bonificaci%C3%B3n,487,507,0,26,7
 297,pueblo+de+Mar%C3%ADn,514,525,2134461,26,0
 298,Pueblo+de+bonificaci%C3%B3n,519,522,0,26,1
-299,Pueblo+de+bonificaci%C3%B3n,490,518,0,26,5
+299,Pueblo+de+bonificaci%C3%B3n,490,518,0,32,5
 300,pueblo+de+ElMarto,525,520,2134795,26,0
 301,Pueblo+de+b%C3%A1rbaros,500,476,0,26,0
 302,Pueblo+de+bonificaci%C3%B3n,506,512,0,26,4
@@ -347,7 +347,7 @@
 347,pueblo+de+lfalquee,518,494,2180991,26,0
 348,Pueblo+de+bonificaci%C3%B3n,478,468,0,26,4
 349,pueblo+de+AndrewZeus,518,486,2181774,26,0
-350,Pueblo+de+b%C3%A1rbaros,490,515,0,26,0
+350,Pueblo+de+b%C3%A1rbaros,490,515,0,27,0
 351,Pueblo+de+bonificaci%C3%B3n,501,560,0,26,8
 352,Pueblo+de+bonificaci%C3%B3n,465,472,0,26,9
 353,pueblo+de+cieguin-55,509,493,2181431,26,0
@@ -373,7 +373,7 @@
 373,pueblo+de+bramdalar,508,518,266664,26,0
 374,Pueblo+de+bonificaci%C3%B3n,522,517,0,26,7
 375,pueblo+de+mafiu35,514,510,701464,26,0
-376,Pueblo+de+b%C3%A1rbaros,535,502,0,26,0
+376,Pueblo+de+b%C3%A1rbaros,535,502,0,28,0
 377,Pueblo+de+bonificaci%C3%B3n,479,511,0,26,1
 378,Pueblo+de+bonificaci%C3%B3n,487,495,0,26,1
 379,pueblo+de+jjert,505,519,781658,26,0
@@ -391,7 +391,7 @@
 391,Pueblo+de+bonificaci%C3%B3n,475,446,0,26,5
 392,pueblo+de+xpopex,504,496,1351573,26,0
 393,Pueblo+de+b%C3%A1rbaros,462,525,0,26,0
-394,Pueblo+de+bonificaci%C3%B3n,514,527,0,26,3
+394,Pueblo+de+bonificaci%C3%B3n,514,527,0,27,3
 395,pueblo+de+thiron,509,517,1427030,26,0
 396,Pueblo+de+b%C3%A1rbaros,513,528,0,26,0
 397,Pueblo+de+bonificaci%C3%B3n,548,518,0,26,1
@@ -458,7 +458,7 @@
 458,Pueblo+de+bonificaci%C3%B3n,479,526,0,26,3
 459,pueblo+de+STCG,502,500,813,26,0
 460,Pueblo+de+bonificaci%C3%B3n,506,508,0,26,1
-461,Pueblo+de+bonificaci%C3%B3n,533,505,0,26,3
+461,Pueblo+de+bonificaci%C3%B3n,533,505,0,32,3
 462,pueblo+de+Fran99,505,491,141108,26,0
 463,Pueblo+de+bonificaci%C3%B3n,524,537,0,26,3
 464,Pueblo+de+bonificaci%C3%B3n,530,484,0,26,1
@@ -612,11 +612,11 @@
 612,pueblo+de+nicolasedu76,497,506,987383,26,0
 613,Pueblo+de+bonificaci%C3%B3n,509,481,0,26,7
 614,pueblo+de+rocky,515,528,15291,26,0
-615,Pueblo+de+b%C3%A1rbaros,524,522,0,26,0
+615,Pueblo+de+b%C3%A1rbaros,524,522,0,27,0
 616,Pueblo+de+bonificaci%C3%B3n,488,477,0,26,9
 617,Pueblo+de+bonificaci%C3%B3n,473,512,0,26,7
 618,pueblo+de+Mexico+3000,518,520,182449,26,0
-619,Pueblo+de+b%C3%A1rbaros,472,473,0,26,0
+619,Pueblo+de+b%C3%A1rbaros,472,473,0,32,0
 620,Pueblo+de+bonificaci%C3%B3n,516,481,0,26,1
 621,Pueblo+de+bonificaci%C3%B3n,442,505,0,26,6
 622,pueblo+de+MMansillaLF,524,535,193545,26,0
@@ -630,7 +630,7 @@
 630,pueblo+de+ReeduS.,508,527,1709215,26,0
 631,Pueblo+de+b%C3%A1rbaros,554,501,0,26,0
 632,Pueblo+de+bonificaci%C3%B3n,523,495,0,26,3
-633,Pueblo+de+bonificaci%C3%B3n,531,505,0,26,1
+633,Pueblo+de+bonificaci%C3%B3n,531,505,0,28,1
 634,pueblo+de+Jaimerm,511,534,1796126,26,0
 635,Pueblo+de+b%C3%A1rbaros,557,495,0,26,0
 636,Pueblo+de+bonificaci%C3%B3n,503,525,0,26,7
@@ -707,7 +707,7 @@
 707,pueblo+de+agust+el+grande,512,524,779531,26,0
 708,Pueblo+de+bonificaci%C3%B3n,545,500,0,32,9
 709,pueblo+de+villacis21,499,524,883040,26,0
-710,Pueblo+de+b%C3%A1rbaros,542,489,0,26,0
+710,Pueblo+de+b%C3%A1rbaros,542,489,0,50,0
 711,Pueblo+de+bonificaci%C3%B3n,519,546,0,26,9
 712,pueblo+de+peruanisi,516,524,987723,26,0
 713,Pueblo+de+bonificaci%C3%B3n,503,451,0,26,5
@@ -731,7 +731,7 @@
 731,Pueblo+de+bonificaci%C3%B3n,443,498,0,28,1
 732,pueblo+de+Sir+Franji,493,528,1479932,26,0
 733,Pueblo+de+b%C3%A1rbaros,501,529,0,26,0
-734,Pueblo+de+bonificaci%C3%B3n,520,537,0,26,5
+734,Pueblo+de+bonificaci%C3%B3n,520,537,0,27,5
 735,Pueblo+de+bonificaci%C3%B3n,538,501,0,26,7
 736,pueblo+de+PHNeutro,507,540,1549572,26,0
 737,Pueblo+de+bonificaci%C3%B3n,528,488,0,26,6
@@ -855,10 +855,10 @@
 855,Pueblo+de+bonificaci%C3%B3n,452,514,0,26,9
 856,pueblo+de+Caezare2273,487,486,1598893,26,0
 857,Pueblo+de+bonificaci%C3%B3n,468,478,0,26,3
-858,Pueblo+de+bonificaci%C3%B3n,526,493,0,26,7
+858,Pueblo+de+bonificaci%C3%B3n,526,493,0,27,7
 859,pueblo+de+catalufo,470,483,1674937,26,0
 860,Pueblo+de+b%C3%A1rbaros,538,493,0,26,0
-861,Pueblo+de+bonificaci%C3%B3n,503,536,0,26,7
+861,Pueblo+de+bonificaci%C3%B3n,503,536,0,28,7
 862,Pueblo+de+bonificaci%C3%B3n,473,486,0,32,6
 863,pueblo+de+masacre100,483,500,1714244,26,0
 864,Pueblo+de+b%C3%A1rbaros,514,479,0,26,0
@@ -946,7 +946,7 @@
 946,Pueblo+de+bonificaci%C3%B3n,512,472,0,26,3
 947,pueblo+de+AleGG,478,505,2093396,26,0
 948,Pueblo+de+b%C3%A1rbaros,526,477,0,26,0
-949,Pueblo+de+bonificaci%C3%B3n,527,506,0,26,7
+949,Pueblo+de+bonificaci%C3%B3n,527,506,0,32,7
 950,Pueblo+de+bonificaci%C3%B3n,468,520,0,26,9
 951,pueblo+de+SugattFleugg,469,507,2128804,26,0
 952,Pueblo+de+b%C3%A1rbaros,543,462,0,26,0
@@ -981,7 +981,7 @@
 981,Pueblo+de+bonificaci%C3%B3n,481,544,0,26,9
 982,pueblo+de+RonArehucas,496,519,2118228,26,0
 983,Pueblo+de+bonificaci%C3%B3n,477,521,0,26,9
-984,Pueblo+de+bonificaci%C3%B3n,449,521,0,26,5
+984,Pueblo+de+bonificaci%C3%B3n,449,521,0,28,5
 985,pueblo+de+Parchis,488,517,2121004,26,0
 986,Pueblo+de+bonificaci%C3%B3n,473,456,0,26,2
 987,Pueblo+de+bonificaci%C3%B3n,502,494,0,26,4
@@ -1039,7 +1039,7 @@
 1039,pueblo+de+WebOo,481,519,2172107,26,0
 1040,Pueblo+de+bonificaci%C3%B3n,457,470,0,26,9
 1041,pueblo+de+Nuitari,473,535,2172216,26,0
-1042,Pueblo+de+bonificaci%C3%B3n,483,479,0,26,4
+1042,Pueblo+de+bonificaci%C3%B3n,483,479,0,32,4
 1043,pueblo+de+Ostias,484,511,2177225,26,0
 1044,Pueblo+de+bonificaci%C3%B3n,459,497,0,26,9
 1045,Pueblo+de+bonificaci%C3%B3n,533,526,0,26,6
@@ -1153,11 +1153,11 @@
 1153,Pueblo+de+bonificaci%C3%B3n,538,505,0,26,9
 1154,pueblo+de+Benjass,457,498,2181428,26,0
 1155,Pueblo+de+b%C3%A1rbaros,447,492,0,26,0
-1156,Pueblo+de+bonificaci%C3%B3n,550,475,0,26,7
+1156,Pueblo+de+bonificaci%C3%B3n,550,475,0,33,7
 1157,pueblo+de+MagicTopo,512,473,150754,26,0
 1158,Pueblo+de+b%C3%A1rbaros,488,494,0,32,0
 1159,Pueblo+de+bonificaci%C3%B3n,494,502,0,26,1
-1160,Pueblo+de+bonificaci%C3%B3n,514,530,0,32,6
+1160,Pueblo+de+bonificaci%C3%B3n,514,530,0,38,6
 1161,pueblo+de+nostromo,510,479,301920,26,0
 1162,Pueblo+de+bonificaci%C3%B3n,465,543,0,26,2
 1163,Pueblo+de+bonificaci%C3%B3n,527,511,0,26,1
@@ -1203,7 +1203,7 @@
 1203,Pueblo+de+bonificaci%C3%B3n,501,555,0,26,8
 1204,pueblo+de+welcometoxanke,493,476,1830186,26,0
 1205,Pueblo+de+bonificaci%C3%B3n,537,533,0,26,8
-1206,Pueblo+de+bonificaci%C3%B3n,484,525,0,26,9
+1206,Pueblo+de+bonificaci%C3%B3n,484,525,0,32,9
 1207,pueblo+de+.BudoKai.,514,462,1898371,26,0
 1208,Pueblo+de+b%C3%A1rbaros,450,465,0,26,0
 1209,Pueblo+de+bonificaci%C3%B3n,497,488,0,26,6
@@ -1228,12 +1228,12 @@
 1228,Pueblo+de+bonificaci%C3%B3n,516,474,0,26,1
 1229,pueblo+de+Shaka+Zulu,520,469,2095097,26,0
 1230,Pueblo+de+b%C3%A1rbaros,494,489,0,26,0
-1231,Pueblo+de+bonificaci%C3%B3n,510,488,0,26,2
+1231,Pueblo+de+bonificaci%C3%B3n,510,488,0,32,2
 1232,pueblo+de+jose65,509,451,2098997,26,0
 1233,Pueblo+de+bonificaci%C3%B3n,455,493,0,26,1
 1234,Pueblo+de+bonificaci%C3%B3n,494,463,0,26,7
 1235,pueblo+de+Welmejorr,525,476,2115128,26,0
-1236,Pueblo+de+bonificaci%C3%B3n,513,513,0,26,7
+1236,Pueblo+de+bonificaci%C3%B3n,513,513,0,28,7
 1237,pueblo+de+Masca1,527,471,2115188,26,0
 1238,Pueblo+de+b%C3%A1rbaros,491,497,0,26,0
 1239,Pueblo+de+bonificaci%C3%B3n,446,515,0,26,6
@@ -1399,7 +1399,7 @@
 1399,Pueblo+de+bonificaci%C3%B3n,475,529,0,26,6
 1400,Pueblo+de+bonificaci%C3%B3n,466,465,0,26,6
 1401,pueblo+de+Thibaut+Courtois,537,490,1390210,26,0
-1402,Pueblo+de+b%C3%A1rbaros,524,453,0,26,0
+1402,Pueblo+de+b%C3%A1rbaros,524,453,0,27,0
 1403,Pueblo+de+bonificaci%C3%B3n,548,501,0,26,4
 1404,pueblo+de+Nietzs,541,484,1571842,26,0
 1405,Pueblo+de+bonificaci%C3%B3n,461,474,0,26,1
@@ -1432,7 +1432,7 @@
 1432,Pueblo+de+bonificaci%C3%B3n,560,496,0,26,9
 1433,pueblo+de+Maik,558,487,2084332,26,0
 1434,Pueblo+de+b%C3%A1rbaros,513,522,0,26,0
-1435,Pueblo+de+bonificaci%C3%B3n,469,468,0,26,5
+1435,Pueblo+de+bonificaci%C3%B3n,469,468,0,27,5
 1436,pueblo+de+skalkh,551,493,231570,26,0
 1437,Pueblo+de+b%C3%A1rbaros,490,516,0,26,0
 1438,Pueblo+de+bonificaci%C3%B3n,489,460,0,26,3
@@ -1466,7 +1466,7 @@
 1466,Pueblo+de+b%C3%A1rbaros,485,550,0,26,0
 1467,Pueblo+de+bonificaci%C3%B3n,458,505,0,26,3
 1468,pueblo+de+-Miky+Woodz-,516,459,1947487,26,0
-1469,Pueblo+de+b%C3%A1rbaros,496,522,0,26,0
+1469,Pueblo+de+b%C3%A1rbaros,496,522,0,32,0
 1470,Pueblo+de+bonificaci%C3%B3n,532,498,0,32,8
 1471,pueblo+de+Don+Alkimia,509,471,2145649,26,0
 1472,Pueblo+de+bonificaci%C3%B3n,520,489,0,26,6
@@ -1505,7 +1505,7 @@
 1505,Pueblo+de+bonificaci%C3%B3n,515,546,0,26,5
 1506,pueblo+de+...Napo...,470,462,953649,26,0
 1507,Pueblo+de+bonificaci%C3%B3n,502,547,0,26,4
-1508,Pueblo+de+bonificaci%C3%B3n,555,497,0,26,9
+1508,Pueblo+de+bonificaci%C3%B3n,555,497,0,27,9
 1509,pueblo+de+Experto,472,456,66230,26,0
 1510,Pueblo+de+b%C3%A1rbaros,446,471,0,26,0
 1511,Pueblo+de+bonificaci%C3%B3n,550,498,0,26,2
@@ -1534,7 +1534,7 @@
 1534,Pueblo+de+bonificaci%C3%B3n,558,493,0,26,1
 1535,pueblo+de+angelito21,504,539,1847699,26,0
 1536,Pueblo+de+bonificaci%C3%B3n,475,454,0,26,4
-1537,Pueblo+de+bonificaci%C3%B3n,517,511,0,26,5
+1537,Pueblo+de+bonificaci%C3%B3n,517,511,0,32,5
 1538,pueblo+de+tecnollave,501,547,1646350,26,0
 1539,Pueblo+de+bonificaci%C3%B3n,485,467,0,26,5
 1540,Pueblo+de+bonificaci%C3%B3n,451,509,0,26,7
@@ -1674,7 +1674,7 @@
 1674,pueblo+de+Crist%C3%B3bal+colon,532,456,2181848,26,0
 1675,Pueblo+de+b%C3%A1rbaros,528,453,0,26,0
 1676,Pueblo+de+bonificaci%C3%B3n,497,456,0,26,6
-1677,Pueblo+de+bonificaci%C3%B3n,550,479,0,26,7
+1677,Pueblo+de+bonificaci%C3%B3n,550,479,0,28,7
 1678,pueblo+de+Geraard59,535,449,2181849,26,0
 1679,Pueblo+de+b%C3%A1rbaros,493,452,0,26,0
 1680,Pueblo+de+bonificaci%C3%B3n,544,481,0,26,8
@@ -1948,7 +1948,7 @@
 1948,pueblo+de+lucianoab1985,537,462,64340,26,0
 1949,Pueblo+de+b%C3%A1rbaros,475,534,0,26,0
 1950,Pueblo+de+bonificaci%C3%B3n,522,457,0,26,7
-1951,Pueblo+de+bonificaci%C3%B3n,503,556,0,26,6
+1951,Pueblo+de+bonificaci%C3%B3n,503,556,0,32,6
 1952,pueblo+de+Geneziz,451,492,77636,26,0
 1953,Pueblo+de+b%C3%A1rbaros,522,508,0,26,0
 1954,Pueblo+de+bonificaci%C3%B3n,496,448,0,26,1
@@ -2095,7 +2095,7 @@
 2095,Pueblo+de+bonificaci%C3%B3n,464,475,0,26,4
 2096,pueblo+de+traj,446,491,776487,26,0
 2097,Pueblo+de+b%C3%A1rbaros,542,463,0,26,0
-2098,Pueblo+de+bonificaci%C3%B3n,455,542,0,26,5
+2098,Pueblo+de+bonificaci%C3%B3n,455,542,0,32,5
 2099,Pueblo+de+bonificaci%C3%B3n,503,509,0,26,6
 2100,pueblo+de+Wiking,523,448,784340,26,0
 2101,Pueblo+de+b%C3%A1rbaros,485,483,0,26,0
@@ -2158,14 +2158,14 @@
 2158,Pueblo+de+bonificaci%C3%B3n,482,536,0,26,4
 2159,pueblo+de+Monhoy,445,491,997469,26,0
 2160,Pueblo+de+b%C3%A1rbaros,483,449,0,26,0
-2161,Pueblo+de+bonificaci%C3%B3n,550,473,0,26,8
+2161,Pueblo+de+bonificaci%C3%B3n,550,473,0,32,8
 2162,pueblo+de+Cabeza23,452,516,1004533,26,0
 2163,Pueblo+de+bonificaci%C3%B3n,526,546,0,26,9
 2164,Pueblo+de+bonificaci%C3%B3n,462,475,0,26,5
 2165,pueblo+de+Reey+Ragnar,529,535,1009265,26,0
 2166,Pueblo+de+b%C3%A1rbaros,461,478,0,26,0
 2167,Pueblo+de+bonificaci%C3%B3n,544,516,0,26,2
-2168,Pueblo+de+bonificaci%C3%B3n,522,550,0,26,7
+2168,Pueblo+de+bonificaci%C3%B3n,522,550,0,28,7
 2169,pueblo+de+chus96,450,468,1011913,26,0
 2170,Pueblo+de+bonificaci%C3%B3n,475,458,0,26,3
 2171,Pueblo+de+bonificaci%C3%B3n,540,483,0,26,5
@@ -2368,7 +2368,7 @@
 2368,Pueblo+de+bonificaci%C3%B3n,523,454,0,26,5
 2369,pueblo+de+iAndtonio,472,446,1613254,26,0
 2370,Pueblo+de+b%C3%A1rbaros,527,501,0,26,0
-2371,Pueblo+de+bonificaci%C3%B3n,530,539,0,26,5
+2371,Pueblo+de+bonificaci%C3%B3n,530,539,0,27,5
 2372,Pueblo+de+bonificaci%C3%B3n,490,514,0,26,4
 2373,pueblo+de+Pekadores,542,537,1614522,26,0
 2374,Pueblo+de+b%C3%A1rbaros,500,470,0,26,0
@@ -2428,7 +2428,7 @@
 2428,Pueblo+de+bonificaci%C3%B3n,485,482,0,26,8
 2429,Pueblo+de+bonificaci%C3%B3n,467,514,0,26,4
 2430,pueblo+de+Alejandro20,494,485,1706235,26,0
-2431,Pueblo+de+b%C3%A1rbaros,522,551,0,26,0
+2431,Pueblo+de+b%C3%A1rbaros,522,551,0,27,0
 2432,Pueblo+de+bonificaci%C3%B3n,517,444,0,26,2
 2433,Pueblo+de+bonificaci%C3%B3n,552,483,0,26,1
 2434,pueblo+de+MorCloud,511,452,1707975,26,0
@@ -2437,7 +2437,7 @@
 2437,Pueblo+de+bonificaci%C3%B3n,442,494,0,26,8
 2438,pueblo+de+Carlito+Brigante,451,497,1718539,26,0
 2439,Pueblo+de+bonificaci%C3%B3n,484,467,0,26,8
-2440,Pueblo+de+bonificaci%C3%B3n,544,502,0,26,1
+2440,Pueblo+de+bonificaci%C3%B3n,544,502,0,32,1
 2441,pueblo+de+LITANIRIVER,540,459,1723176,26,0
 2442,Pueblo+de+bonificaci%C3%B3n,539,527,0,26,9
 2443,Pueblo+de+bonificaci%C3%B3n,467,525,0,26,5
@@ -2671,12 +2671,12 @@
 2671,pueblo+de+Khalesiii,520,452,2068059,26,0
 2672,Pueblo+de+bonificaci%C3%B3n,469,551,0,26,1
 2673,pueblo+de+Dgak,512,460,2068769,26,0
-2674,Pueblo+de+b%C3%A1rbaros,535,470,0,26,0
+2674,Pueblo+de+b%C3%A1rbaros,535,470,0,28,0
 2675,Pueblo+de+bonificaci%C3%B3n,517,555,0,26,2
 2676,pueblo+de+Rey+Maurikinger,476,506,2069901,26,0
 2677,Pueblo+de+bonificaci%C3%B3n,533,543,0,26,9
 2678,pueblo+de+Darcking,553,486,2070095,26,0
-2679,Pueblo+de+b%C3%A1rbaros,532,509,0,26,0
+2679,Pueblo+de+b%C3%A1rbaros,532,509,0,32,0
 2680,Pueblo+de+bonificaci%C3%B3n,485,532,0,26,9
 2681,Pueblo+de+bonificaci%C3%B3n,528,541,0,26,6
 2682,pueblo+de+rubiales555,462,499,2070424,26,0
@@ -2779,7 +2779,7 @@
 2779,pueblo+de+marc313,487,544,2104192,26,0
 2780,Pueblo+de+bonificaci%C3%B3n,476,554,0,26,7
 2781,pueblo+de+Muyayin,525,477,2105233,26,0
-2782,Pueblo+de+b%C3%A1rbaros,534,531,0,26,0
+2782,Pueblo+de+b%C3%A1rbaros,534,531,0,32,0
 2783,Pueblo+de+bonificaci%C3%B3n,472,521,0,26,4
 2784,Pueblo+de+bonificaci%C3%B3n,513,552,0,26,2
 2785,pueblo+de+Lowasd,486,519,2105689,26,0
@@ -3221,7 +3221,7 @@
 3221,pueblo+de+MuadiB,463,527,2176885,26,0
 3222,Pueblo+de+b%C3%A1rbaros,466,464,0,26,0
 3223,Pueblo+de+bonificaci%C3%B3n,496,529,0,26,2
-3224,Pueblo+de+bonificaci%C3%B3n,496,458,0,26,9
+3224,Pueblo+de+bonificaci%C3%B3n,496,458,0,32,9
 3225,pueblo+de+MrHood,474,553,2176927,26,0
 3226,Pueblo+de+bonificaci%C3%B3n,512,498,0,26,5
 3227,pueblo+de+LastKingdom,473,453,2176932,26,0
@@ -3273,7 +3273,7 @@
 3273,Pueblo+de+bonificaci%C3%B3n,445,503,0,26,3
 3274,pueblo+de+Ivan+montana,511,530,2178122,26,0
 3275,Pueblo+de+b%C3%A1rbaros,502,515,0,26,0
-3276,Pueblo+de+bonificaci%C3%B3n,441,492,0,26,2
+3276,Pueblo+de+bonificaci%C3%B3n,441,492,0,32,2
 3277,Pueblo+de+bonificaci%C3%B3n,484,445,0,26,5
 3278,pueblo+de+Uthred,470,449,2178123,26,0
 3279,Pueblo+de+bonificaci%C3%B3n,485,530,0,26,4
@@ -3325,7 +3325,7 @@
 3325,Pueblo+de+bonificaci%C3%B3n,443,492,0,26,4
 3326,pueblo+de+Savitar,560,502,2179093,26,0
 3327,Pueblo+de+b%C3%A1rbaros,531,456,0,26,0
-3328,Pueblo+de+bonificaci%C3%B3n,494,524,0,26,8
+3328,Pueblo+de+bonificaci%C3%B3n,494,524,0,32,8
 3329,Pueblo+de+bonificaci%C3%B3n,522,456,0,26,7
 3330,pueblo+de+CapitaRoger,536,548,2179095,26,0
 3331,Pueblo+de+b%C3%A1rbaros,462,491,0,26,0
@@ -3349,7 +3349,7 @@
 3349,Pueblo+de+bonificaci%C3%B3n,547,476,0,26,8
 3350,pueblo+de+MaGaMe72,482,552,2179399,26,0
 3351,Pueblo+de+b%C3%A1rbaros,515,542,0,26,0
-3352,Pueblo+de+bonificaci%C3%B3n,517,537,0,26,5
+3352,Pueblo+de+bonificaci%C3%B3n,517,537,0,27,5
 3353,Pueblo+de+bonificaci%C3%B3n,497,484,0,26,3
 3354,pueblo+de+biyiksito,459,533,2179535,26,0
 3355,Pueblo+de+b%C3%A1rbaros,488,527,0,26,0
@@ -3375,7 +3375,7 @@
 3375,Pueblo+de+bonificaci%C3%B3n,529,481,0,26,1
 3376,Pueblo+de+bonificaci%C3%B3n,486,506,0,26,4
 3377,pueblo+de+Bache,495,499,2180160,26,0
-3378,Pueblo+de+b%C3%A1rbaros,491,559,0,26,0
+3378,Pueblo+de+b%C3%A1rbaros,491,559,0,27,0
 3379,Pueblo+de+bonificaci%C3%B3n,490,560,0,26,8
 3380,Pueblo+de+bonificaci%C3%B3n,452,534,0,26,4
 3381,pueblo+de+gonzatrosero,493,502,2180234,26,0
@@ -3402,7 +3402,7 @@
 3402,Pueblo+de+b%C3%A1rbaros,470,553,0,26,0
 3403,Pueblo+de+bonificaci%C3%B3n,478,469,0,26,1
 3404,pueblo+de+FranB,501,542,2180825,26,0
-3405,Pueblo+de+bonificaci%C3%B3n,538,546,0,26,7
+3405,Pueblo+de+bonificaci%C3%B3n,538,546,0,32,7
 3406,pueblo+de+D3kusitt0,492,554,2180833,26,0
 3407,Pueblo+de+b%C3%A1rbaros,527,516,0,26,0
 3408,Pueblo+de+bonificaci%C3%B3n,493,510,0,26,6
@@ -3574,7 +3574,7 @@
 3574,Pueblo+de+bonificaci%C3%B3n,498,530,0,26,6
 3575,Pueblo+de+bonificaci%C3%B3n,487,473,0,26,9
 3576,pueblo+de+BlaasSG,536,542,2182383,26,0
-3577,Pueblo+de+b%C3%A1rbaros,544,463,0,26,0
+3577,Pueblo+de+b%C3%A1rbaros,544,463,0,32,0
 3578,Pueblo+de+bonificaci%C3%B3n,511,465,0,26,6
 3579,pueblo+de+Sir+daniel,441,502,2182398,26,0
 3580,Pueblo+de+bonificaci%C3%B3n,485,444,0,26,8
@@ -3754,7 +3754,7 @@
 3754,pueblo+de+Sotek,488,545,2183956,26,0
 3755,Pueblo+de+b%C3%A1rbaros,458,506,0,26,0
 3756,Pueblo+de+bonificaci%C3%B3n,534,539,0,26,7
-3757,Pueblo+de+bonificaci%C3%B3n,551,465,0,26,2
+3757,Pueblo+de+bonificaci%C3%B3n,551,465,0,27,2
 3758,pueblo+de+arp1+returns,533,448,2183958,26,0
 3759,Pueblo+de+b%C3%A1rbaros,454,541,0,26,0
 3760,Pueblo+de+bonificaci%C3%B3n,495,439,0,26,4
