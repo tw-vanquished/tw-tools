@@ -1,9 +1,9 @@
-1,ABUELOS+ESPARTANOS,ABUS,14,0,0,0,33
+1,ABUELOS+ESPARTANOS,ABUS,15,0,0,0,33
 2,La+Gran+Armada,G.A.,21,0,0,0,23
 3,Fantasmas,FTS,24,0,0,0,24
 4,EL+TEMPLO,TEMPLO,40,0,0,0,25
 7,Gibraltar+Espa%C3%B1ol,GESP,3,0,0,0,26
-8,Enanos+Herreros+2.0,ENANOS,2,0,0,0,27
+8,Enanos+Herreros+2.0,ENANOS,3,0,0,0,27
 9,Sin+Temor,SINTM,30,0,0,0,28
 10,%7E+Los+Renacidos+%7E,%7EReNa%7E,40,0,0,0,29
 11,SUDARIO+DEL+LOBO+DEL+INFIERNO,SLI,3,0,0,0,30
@@ -38,5 +38,5 @@
 49,Lince,LNC,1,0,0,0,17
 50,MERCENARIOS,MERC,6,0,0,0,18
 51,Refugiados,Ref.,1,0,0,0,19
-52,Trono+de+hierro,TRONO,6,0,0,0,20
+52,Trono+de+hierro,TRONO,7,0,0,0,20
 53,Un+Nuevo+Comienzo,U.N.C,1,0,0,0,21
