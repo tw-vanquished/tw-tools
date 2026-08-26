@@ -3,7 +3,7 @@
 3,Fantasmas,FTS,24,0,0,0,24
 4,EL+TEMPLO,TEMPLO,40,0,0,0,25
 7,Gibraltar+Espa%C3%B1ol,GESP,3,0,0,0,26
-8,Enanos+Herreros+2.0,ENANOS,3,0,0,0,27
+8,Enanos+Herreros+2.0,ENANOS,2,0,0,0,27
 9,Sin+Temor,SINTM,30,0,0,0,28
 10,%7E+Los+Renacidos+%7E,%7EReNa%7E,40,0,0,0,29
 11,SUDARIO+DEL+LOBO+DEL+INFIERNO,SLI,3,0,0,0,30
