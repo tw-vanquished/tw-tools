@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Ennoblecimientos</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Ennoblecimientos
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <p class="meta-line" id="metaLine">cargando…</p>
+
+    <form class="conquer-filters" id="filters" onsubmit="return false">
+      <div class="f grow">
+        <label for="search">Buscar</label>
+        <input id="search" type="search" placeholder="jugador, tribu, pueblo o coord (500|600)…" autocomplete="off">
+      </div>
+      <div class="f">
+        <label for="minpoints">Puntos mínimo</label>
+        <input id="minpoints" type="number" min="0" step="1" placeholder="0">
+      </div>
+      <div class="f">
+        <label for="maxpoints">Puntos máximo</label>
+        <input id="maxpoints" type="number" min="0" step="1" placeholder="∞">
+      </div>
+      <div class="f">
+        <label for="filtertribe">Tribu</label>
+        <select id="filtertribe"><option value="0">Sin filtro</option></select>
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <div class="scope">
+          <button type="button" id="scopeRecent" class="seg active" data-scope="recent">Últimos 7 días</button>
+          <button type="button" id="scopeAll" class="seg" data-scope="all">Todo el historial</button>
+        </div>
+      </div>
+    </form>
+
+    <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). El historial de evolución comienza el 2026-06-11 (inicio del registro). Puntos = puntos del pueblo en el momento del ennoblecimiento (aprox., del registro más cercano).</p>
+    <p id="status" class="status">Cargando…</p>
+
+    <div class="table-wrap">
+      <table class="vis widget" id="tbl">
+        <thead>
+          <tr>
+            <th class="c-vil">Pueblos</th>
+            <th class="c-pts">Puntos</th>
+            <th class="c-old">Antiguo Dueño</th>
+            <th class="c-new">Nuevo Dueño</th>
+            <th class="c-date">Fecha/Tiempo</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <button type="button" id="prev">‹ Anterior</button>
+      <span id="pageInfo">—</span>
+      <button type="button" id="next">Siguiente ›</button>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial. Historial que twstats descarta tras 7 días.</p>
+  </div>
+
+  <script src="js/common.js?v=20260826.1"></script>
+  <script src="js/conquers.js?v=20260826.1"></script>
+</body>
+</html>

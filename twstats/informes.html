@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Subir Informes</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Subir Informes
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <div class="info-box">
+      <span class="info-i">i</span>
+      Sube aquí tus informes de batalla y alimenta la <b>base de datos compartida</b> de la
+      tribu: los pueblos de origen de tus <b>Entrantes</b> se etiquetan 📄<b>OFF/DEF</b> con
+      evidencia real, el detector de fakes se afina, y la calculadora muestra lo mismo en su
+      pestaña Aldeas Enemigas y en el Mapa.
+      <br><b>Cómo:</b> en el juego, abre la vista de <b>Informes</b>, ejecuta
+      <b>reportsExport.js</b> (quickbar), selecciona los informes de ataque/defensa y guarda
+      el <code>tw-reports-*.json</code>. Después súbelo aquí — los informes se deduplican,
+      así que subir de más nunca estorba.
+    </div>
+
+    <div class="rep-share-row">
+      <input type="file" id="repFiles" multiple accept=".json,application/json">
+      <button type="button" class="seg" id="repPasteBtn">Pegar JSON</button>
+      <button type="button" class="seg" id="repUpload">Subir</button>
+      <button type="button" class="seg" id="repView">Ver</button>
+      <span id="repStatus" class="tz-note"></span>
+    </div>
+
+    <!-- Paste alternative (2026-08-06): the tw-reports-*.json can be pasted
+         instead of chosen as a file — same as the calculator's Village Reports
+         tab. Subir and Ver read files ∪ pasted text. -->
+    <div id="repPasteWrap" hidden>
+      <textarea id="repPaste" rows="5" spellcheck="false"
+        placeholder="Pega aquí el contenido del tw-reports-*.json…"></textarea>
+    </div>
+
+    <!-- Local viewer: renders the chosen tw-reports-*.json like the in-game
+         reports (report-render.js). Nothing leaves the browser. -->
+    <div id="viewerWrap" hidden>
+      <p class="meta-line" id="viewerLine"></p>
+      <div id="viewerList" class="twrr-list"></div>
+    </div>
+
+    <p class="meta-line" id="dbLine">Consultando la BD compartida…</p>
+
+    <p class="tz-note">Los informes espiados aportan tropas dentro/fuera y edificios; los
+    ataques que recibes confirman pueblos OFF (por lo que envían). La información de un
+    pueblo que cambió de dueño se descarta sola.</p>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <!-- Versioned query: Pages serves css/ and js/ with Cache-Control: max-age=600.
+       Bump ?v=20260826.1 on EVERY asset change, site-wide; the token is shared by all
+       twstats pages. -->
+  <script src="js/common.js?v=20260826.1"></script>
+  <!-- The calculator's pure reports-intel module (riAge here) — same file the
+       calculator and Entrantes use. -->
+  <script src="../js/reports-intel.js?v=20260826.1"></script>
+  <script src="../js/report-render.js?v=20260826.1"></script>
+  <script src="js/informes.js?v=20260826.1"></script>
+</body>
+</html>

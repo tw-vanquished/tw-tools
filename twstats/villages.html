@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Pueblos</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Pueblos
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <form class="conquer-filters" id="filters" onsubmit="return false">
+      <div class="f grow">
+        <label for="search">Buscar</label>
+        <input id="search" type="search" placeholder="nombre o coordenada (500|600)…" autocomplete="off">
+      </div>
+    </form>
+
+    <p class="meta-line" id="countNote">—</p>
+    <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). El historial de evolución comienza el 2026-06-11 (inicio del registro). Ordenado por puntos.</p>
+    <p id="status" class="status">Cargando…</p>
+
+    <div class="table-wrap">
+      <table class="vis widget" id="tbl">
+        <thead>
+          <tr>
+            <th class="col-rank">Ranking</th>
+            <th>Pueblo</th>
+            <th class="col-pts">Puntos</th>
+            <th>Dueño</th>
+            <th>Tribu</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <button type="button" id="prev">‹ Anterior</button>
+      <span id="pageInfo">—</span>
+      <button type="button" id="next">Siguiente ›</button>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <script src="js/common.js?v=20260826.1"></script>
+  <script src="js/villages.js?v=20260826.1"></script>
+</body>
+</html>

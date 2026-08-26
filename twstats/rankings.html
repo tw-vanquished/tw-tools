@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Clasificación</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> <span id="modeTitle">Clasificación</span>
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <form class="conquer-filters" id="filters" onsubmit="return false">
+      <div class="f grow">
+        <label for="search">Buscar</label>
+        <input id="search" type="search" placeholder="nombre o tag…" autocomplete="off">
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <div class="scope">
+          <button type="button" id="modePlayers" class="seg" data-mode="players">Jugadores</button>
+          <button type="button" id="modeTribes" class="seg" data-mode="tribes">Tribus</button>
+        </div>
+      </div>
+    </form>
+
+    <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). El historial de evolución comienza el 2026-06-11 (inicio del registro). Δ7d = variación de puntos en 7 días. Haz clic en una cabecera para ordenar.</p>
+    <p id="status" class="status">Cargando…</p>
+
+    <div class="table-wrap">
+      <table class="vis widget sortable" id="tbl">
+        <thead id="thead"></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="pager">
+      <button type="button" id="prev">‹ Anterior</button>
+      <span id="pageInfo">—</span>
+      <button type="button" id="next">Siguiente ›</button>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <script src="js/common.js?v=20260826.1"></script>
+  <script src="js/rankings.js?v=20260826.1"></script>
+</body>
+</html>

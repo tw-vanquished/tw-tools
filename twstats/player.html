@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Jugador</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Jugador
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). El historial de evolución comienza el 2026-06-11 (inicio del registro).</p>
+    <p id="status" class="status">Cargando…</p>
+
+    <div id="content" hidden>
+      <h3 id="pageTitle">Perfil del Jugador</h3>
+
+      <nav class="tabs" aria-label="Secciones">
+        <button type="button" class="tab active" data-tab="perfil">Perfil</button>
+        <button type="button" class="tab" data-tab="historial">Historial</button>
+        <button type="button" class="tab" data-tab="pueblos">Pueblos</button>
+        <button type="button" class="tab" data-tab="conquistas">Conquistas</button>
+      </nav>
+
+      <section class="tab-panel" data-panel="perfil">
+        <div class="profile-row">
+          <div class="table-wrap profile-wrap">
+            <table class="vis widget profile"><tbody id="profileBody"></tbody></table>
+            <p class="foot-note">* desde 2026-06-11 (inicio del registro): el archivo no cubre la vida completa del mundo.</p>
+          </div>
+          <div class="profile-chart" id="perfilChart"></div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="historial" hidden>
+        <div id="histChart" class="hist-chart"></div>
+        <div class="table-wrap">
+          <table class="vis widget">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th class="col-pts">Ranking</th>
+                <th class="col-pts">Puntos</th>
+                <th class="col-pts">Pueblos</th>
+                <th class="col-pts">OD Totales</th>
+                <th class="col-pts">OD Atacante</th>
+                <th class="col-pts">OD Defensor</th>
+                <th class="col-pts">OD Apoyo</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="pueblos" hidden>
+        <div class="box-title sub">Pueblos <span id="villagesCount" class="count"></span></div>
+        <div class="table-wrap">
+          <table class="vis widget">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th class="col-pts">Puntos</th>
+                <th>Ubicación</th>
+                <th>Continente</th>
+              </tr>
+            </thead>
+            <tbody id="villagesBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="conquistas" hidden>
+        <div class="scope conq-filter">
+          <button type="button" class="seg active" data-conq="all">Todo</button>
+          <button type="button" class="seg" data-conq="gain">Ganados</button>
+          <button type="button" class="seg" data-conq="lose">Perdidos</button>
+        </div>
+
+        <div id="gainsSection">
+          <div class="box-title sub">Ganados <span id="gainsCount" class="count"></span></div>
+          <div class="table-wrap">
+            <table class="vis widget">
+              <thead>
+                <tr>
+                  <th class="c-vil">Pueblos</th>
+                  <th class="c-pts">Puntos</th>
+                  <th class="c-old">Antiguo Dueño</th>
+                  <th class="c-new">Nuevo Dueño</th>
+                  <th class="c-date">Fecha/Tiempo</th>
+                </tr>
+              </thead>
+              <tbody id="gainsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="lossesSection">
+          <div class="box-title sub">Perdidos <span id="lossesCount" class="count"></span></div>
+          <div class="table-wrap">
+            <table class="vis widget">
+              <thead>
+                <tr>
+                  <th class="c-vil">Pueblos</th>
+                  <th class="c-pts">Puntos</th>
+                  <th class="c-old">Antiguo Dueño</th>
+                  <th class="c-new">Nuevo Dueño</th>
+                  <th class="c-date">Fecha/Tiempo</th>
+                </tr>
+              </thead>
+              <tbody id="lossesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <script src="js/common.js?v=20260826.1"></script>
+  <script src="js/chart.js?v=20260826.1"></script>
+  <script src="js/player.js?v=20260826.1"></script>
+</body>
+</html>

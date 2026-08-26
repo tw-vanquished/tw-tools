@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Entrantes</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Entrantes
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <p class="meta-line" id="metaLine">cargando…</p>
+
+    <div class="info-box">
+      <span class="info-i">i</span>
+      Pega lo que te está atacando. Se marcan los pueblos con <b>pocos puntos</b>
+      (pueblo pequeño → poca capacidad ofensiva) o <b>conquistados hace poco</b>
+      (tropas aún sin reconstruir) — candidatos a <b>fake</b>. Se aceptan dos formatos:
+      una <b>lista de coordenadas</b> (<code>573|525 572|527 …</code>), o el
+      <b>volcado BB-code de tus entrantes</b> con las líneas
+      <code>[command]attack[/command]</code>. Con el volcado, cada conquista se compara
+      con la hora de <b>envío</b> de ese ataque, no con ahora: un ataque con 60 h de
+      viaje salió de un pueblo cuyo estado hace 60 h es el que importa. Además se deduce
+      el <b>tipo de tropa</b> de cada ataque (duración ÷ distancia) y se detectan
+      <b>trenes</b> de comandos.
+      <br><b>Si a tus líneas les falta el <code>sent</code></b> no pasa nada: basta con
+      la hora de llegada más <i>cualquiera</i> de duración o regreso, y si tampoco están,
+      se usa la unidad de la etiqueta (p. ej. «Ariete») con la distancia. Sin nada de eso
+      el envío se acota entre la unidad más lenta y la más rápida. Todo lo deducido va
+      marcado con <span class="derived">≈</span>.
+      <br>Con la fila <code>Defensor:</code> del volcado se juzga además <b>tu</b> pueblo:
+      <span class="flag flag-blindado">Blindado</span> si aguanta de sobra, y
+      <span class="flag flag-esquivar">Esquivar</span> si está sin defensa o es un pueblo
+      ofensivo (ahí lo que interesa es sacar las tropas). Ambos umbrales se ajustan arriba.
+      <br><b>Opcional:</b> con «.json Órdenes» puedes subir el
+      <code>incoming_orders*.json</code> del script exportador de órdenes — cada ataque
+      que coincida (objetivo + origen + hora de llegada exacta) muestra además las
+      <b>unidades reales</b> del comando y su <b>tamaño</b> (el icono del juego).
+    </div>
+
+    <form class="conquer-filters" id="filters" onsubmit="return false">
+      <div class="f">
+        <label for="minpoints">Puntos mínimos (marcar por debajo)</label>
+        <input id="minpoints" type="number" min="0" step="100" value="3000">
+      </div>
+      <div class="f">
+        <label for="maxdays">Conquistado hace menos de (días)</label>
+        <input id="maxdays" type="number" min="0" step="1" value="4">
+      </div>
+      <div class="f">
+        <label for="blindado">«Blindado» desde (tropas def.)</label>
+        <input id="blindado" type="number" min="0" step="1000" value="30000">
+      </div>
+      <div class="f">
+        <label for="esquivar">«Esquivar» por debajo de (tropas def.)</label>
+        <input id="esquivar" type="number" min="0" step="500" value="2000">
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <label class="chk"><input id="onlyflagged" type="checkbox"> Solo marcados</label>
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <label class="chk"><input id="groupbytarget" type="checkbox"> Agrupar por pueblo objetivo</label>
+      </div>
+    </form>
+
+    <form class="conquer-filters coord-form" id="coordForm" onsubmit="return false">
+      <div class="f grow">
+        <label for="coords">Coordenadas o volcado de entrantes — el formato se detecta solo</label>
+        <textarea id="coords" rows="6" spellcheck="false"
+          placeholder="573|525 572|527 574|511 …&#10;— o pega tus entrantes en BB-code —&#10;[b]Pueblo:[/b] [coord]571|523[/coord]&#10;    [command]attack[/command] Ariete | player … | sent 26.07 20:44:20 | … [coord]553|470[/coord] --> Hora de llegada: 28.07.26 00:43:32:768 …"></textarea>
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <div class="scope">
+          <button type="button" id="analyze" class="seg">Analizar</button>
+          <button type="button" id="clear" class="seg">Limpiar</button>
+          <button type="button" id="ordersBtn" class="seg"
+            title="Opcional: sube el incoming_orders*.json del exportador de órdenes para ver las unidades reales de cada ataque emparejado">.json Órdenes</button>
+        </div>
+        <input type="file" id="ordersFile" accept=".json,application/json" hidden>
+      </div>
+    </form>
+
+    <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). Los datos del mundo se actualizan cada ~2 h: una conquista de hace pocos minutos puede no aparecer todavía. El registro de conquistas cubre todo el mundo desde su inicio.</p>
+    <p id="status" class="status">Cargando datos del mundo…</p>
+    <p class="meta-line" id="summary" hidden>—</p>
+    <p class="tz-note" id="modeNote" hidden>—</p>
+    <p class="tz-note" id="ordersNote" hidden>—</p>
+    <p class="status" id="warnLine" hidden>—</p>
+
+    <div id="panels" hidden>
+      <details class="panel" id="panelResumen" open>
+        <summary>Resumen</summary>
+        <div class="panel-body two-col">
+          <div id="totals"></div>
+          <div id="opSpotter"></div>
+        </div>
+      </details>
+
+      <details class="panel" id="panelFiltros">
+        <summary>Filtrar ataques</summary>
+        <div class="panel-body" id="attackFilters"></div>
+      </details>
+
+      <details class="panel" id="panelCombos">
+        <summary>Combinaciones origen / destino</summary>
+        <div class="panel-body two-col" id="combos"></div>
+      </details>
+
+      <details class="panel" id="panelOwn">
+        <summary>Mis pueblos atacados</summary>
+        <div class="panel-body" id="ownVillages"></div>
+      </details>
+    </div>
+
+    <div class="table-wrap" id="tableWrap" hidden>
+      <table class="vis widget" id="tbl">
+        <thead id="head"></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <!-- Versioned query: Pages serves css/ and js/ with Cache-Control: max-age=600,
+       so a returning visitor can otherwise run a stale common.js (one that
+       predates TW.srvEpoch broke this page outright) or a stale stylesheet that
+       lacks the newer badge styles. Bump ?v=20260826.1 on EVERY asset change, site-wide;
+       the token is shared by all twstats pages. -->
+  <script src="js/common.js?v=20260826.1"></script>
+  <!-- The calculator's pure reports-intel module (riClassify/riStale/riAge) —
+       the SAME file tribe-calculator ships, so twstats verdicts can't drift. -->
+  <script src="../js/reports-intel.js?v=20260826.1"></script>
+  <script src="../js/report-render.js?v=20260826.1"></script>
+  <script src="js/incomings.js?v=20260826.1"></script>
+</body>
+</html>

@@ -1,0 +1,542 @@
+/* twstats-style history site — theme reproduced 1:1 from es.twstats.com
+   (Guerras Tribales Estadísticas). Light default + dark via prefers-color-scheme
+   and an explicit [data-theme] toggle, using twstats' own colour variables. */
+
+:root {
+  --bg-body: #d2c09e;
+  --bg-content: #F1EBDD;
+  --bg-th-left: #DED3B9;
+  --bg-widget: #F4E4BC;
+  --bg-widget-row: #FFF5DA;
+  --bg-widget-row-alt: #F6EBCA;
+  --bg-widget-foot: #F0E2BE;
+  --bg-conquer-filter: #F7EED3;
+  --bg-input: #fff9ef;
+  --bg-bold: #E1D1B1;
+  --bg-tab-active: #fbeecf;
+  --text-primary: #0B0B0B;
+  --text-muted: #555;
+  --link-color: #804000;
+  --link-hover: #0082BE;
+  --border-primary: #804000;
+  --border-secondary: #997733;
+  --border-row: #F7E7C5;
+  --border-tab: #ddb975;
+  --border-light: #d3d3d3;
+  --border-dark: #999;
+  --tw-header-gradient: linear-gradient(to bottom, #e2c07c 0%, #dab874 44%, #c1a264 100%);
+  --btn-gradient: linear-gradient(to bottom, #f6e6cc, #e8d0a8);
+  --btn-gradient-hover: linear-gradient(to bottom, #f0d69a, #e4c484);
+  --delta-up: #1a7a2e;
+  --delta-down: #a01414;
+}
+
+/* twstats' dark parchment palette */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { color-scheme: dark; }
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) {
+  --bg-body: #1d1611; --bg-content: #14100c; --bg-th-left: #2a2013;
+  --bg-widget: #1a140f; --bg-widget-row: #1a140f; --bg-widget-row-alt: #20180f;
+  --bg-widget-foot: #20180f; --bg-conquer-filter: #1a140f; --bg-input: #0e0a07;
+  --bg-bold: #2a2013; --bg-tab-active: #2a2013;
+  --text-primary: #ece1c8; --text-muted: #968670;
+  --link-color: #e8b85e; --link-hover: #f0c870;
+  --border-primary: #4a3b22; --border-secondary: #3a2c1a; --border-row: #251e15;
+  --border-tab: #3a2c1a; --border-light: #3a2c1a; --border-dark: #5e4a2e;
+  --tw-header-gradient: linear-gradient(to bottom, #3a2c1a 0%, #2f2415 50%, #251e15 100%);
+  --btn-gradient: linear-gradient(to bottom, #2a2013, #1a140f);
+  --btn-gradient-hover: linear-gradient(to bottom, #4a3b22, #2a2013);
+  --delta-up: #6fce7e; --delta-down: #e88;
+} }
+:root[data-theme="dark"] {
+  --bg-body: #1d1611; --bg-content: #14100c; --bg-th-left: #2a2013;
+  --bg-widget: #1a140f; --bg-widget-row: #1a140f; --bg-widget-row-alt: #20180f;
+  --bg-widget-foot: #20180f; --bg-conquer-filter: #1a140f; --bg-input: #0e0a07;
+  --bg-bold: #2a2013; --bg-tab-active: #2a2013;
+  --text-primary: #ece1c8; --text-muted: #968670;
+  --link-color: #e8b85e; --link-hover: #f0c870;
+  --border-primary: #4a3b22; --border-secondary: #3a2c1a; --border-row: #251e15;
+  --border-tab: #3a2c1a; --border-light: #3a2c1a; --border-dark: #5e4a2e;
+  --tw-header-gradient: linear-gradient(to bottom, #3a2c1a 0%, #2f2415 50%, #251e15 100%);
+  --btn-gradient: linear-gradient(to bottom, #2a2013, #1a140f);
+  --btn-gradient-hover: linear-gradient(to bottom, #4a3b22, #2a2013);
+  --delta-up: #6fce7e; --delta-down: #e88;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background-color: var(--bg-body);
+  color: var(--text-primary);
+  font-family: Verdana, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+a:link, a:visited { font-weight: 700; color: var(--link-color); text-decoration: none; }
+a:hover, a:active { color: var(--link-hover); text-decoration: none; }
+
+/* Centred content box, à la twstats #main */
+/* Was a fixed 1050px (the twstats reference width). The Entrantes table runs to
+   9 columns, which clipped the Aviso badges, so the shell now grows with the
+   viewport and only caps on very wide screens. width: calc keeps a gutter —
+   `margin: auto` alone collapses to 0 once the cap stops binding. */
+#main {
+  max-width: 1600px; width: calc(100% - 24px); margin: 12px auto; padding: 8px;
+  background-color: var(--bg-content);
+  border: 1px solid var(--border-primary); border-radius: 4px;
+  box-shadow: 1px 1px 2px 1px rgba(0,0,0,.3);
+}
+
+/* Title bar + nav */
+.box-title {
+  background: var(--tw-header-gradient);
+  border: 1px solid var(--border-tab); border-radius: 3px;
+  padding: 5px 8px; margin: 0 0 8px;
+  font-size: 15px; font-weight: 700; color: var(--text-primary);
+}
+.box-title .sep { opacity: .6; font-weight: 400; }
+.mainnav { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 10px; }
+.mainnav a, .mainnav .soon {
+  padding: 4px 9px; border: 1px solid var(--border-tab); border-radius: 3px;
+  font-size: 12px; background: var(--btn-gradient);
+}
+.mainnav a.active { background: var(--bg-tab-active); }
+.mainnav .soon { color: var(--text-muted); opacity: .6; cursor: default; font-weight: 700; }
+
+/* Filter bar (twstats .conquer-filters) */
+.conquer-filters {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+  background-color: var(--bg-conquer-filter);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 8px; margin-bottom: 10px; font-weight: 700;
+}
+.conquer-filters .f { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.conquer-filters label { color: var(--text-muted); }
+.conquer-filters input[type="text"],
+.conquer-filters input[type="search"],
+.conquer-filters input[type="number"],
+.conquer-filters select {
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 4px 6px; font-family: Verdana, Arial, sans-serif; font-size: 12px;
+}
+.conquer-filters input[type="number"] { width: 90px; }
+.conquer-filters .grow { flex: 1 1 220px; }
+.conquer-filters .grow input { width: 100%; }
+button, input[type="submit"] {
+  padding: 5px 12px; border: 1px solid var(--border-light); border-radius: 3px;
+  background: var(--btn-gradient); color: var(--text-primary);
+  font-family: Verdana, Arial, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+button:hover, input[type="submit"]:hover { background: var(--btn-gradient-hover); border-color: var(--border-dark); }
+button:disabled { opacity: .45; cursor: default; }
+.scope { display: inline-flex; }
+.scope .seg { border-radius: 0; }
+.scope .seg:first-child { border-radius: 3px 0 0 3px; }
+.scope .seg:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+.scope .seg.active { background: var(--bg-tab-active); }
+.conq-filter { margin-bottom: 10px; }
+
+.tz-note { margin: 0 0 8px; color: var(--text-muted); font-size: 11px; font-weight: 400; }
+.status { margin: 6px 2px; color: var(--text-muted); font-size: 12px; }
+.meta-line { color: var(--text-muted); font-weight: 400; font-size: 12px; }
+
+/* Data table — twstats table.vis.widget */
+.table-wrap { overflow-x: auto; }
+table.vis {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  border: 1px solid var(--border-secondary); font-size: 12px;
+}
+table.vis th {
+  background: var(--tw-header-gradient); color: var(--text-primary);
+  font-weight: 700; text-align: left; padding: 4px 6px;
+  border-bottom: 1px solid var(--border-tab); white-space: nowrap;
+  position: sticky; top: 0;
+}
+table.vis td { padding: 4px 6px; border-bottom: 1px solid var(--border-row); vertical-align: top; }
+table.vis tr.r1 td { background-color: var(--bg-widget-row); }
+table.vis tr.r2 td { background-color: var(--bg-widget-row-alt); }
+table.vis tbody tr:hover td { background-color: var(--bg-tab-active); }
+.col-pts { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.col-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.coord { color: var(--text-muted); font-weight: 400; }
+.cont { color: var(--text-muted); font-weight: 400; }
+.barb { color: var(--text-muted); font-weight: 400; font-style: italic; }
+.gone { color: var(--text-muted); font-weight: 400; }
+.tribe-br { color: var(--text-muted); font-weight: 400; }
+
+/* Pager */
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0 2px; }
+#pageInfo { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.foot { text-align: center; color: var(--text-muted); font-size: 11px; padding: 12px 8px 4px; }
+
+/* ---- Phase 2 additions ---- */
+
+/* Sub-section title bars (reuse .box-title gradient, a touch smaller). */
+.box-title.sub { font-size: 13px; margin: 14px 0 6px; }
+.box-title.sub .count { font-weight: 400; font-size: 11px; color: var(--text-muted); }
+h3 { font-size: 15px; margin: 6px 2px 10px; }
+.archived { color: var(--text-muted); font-weight: 400; font-size: 12px; font-style: italic; }
+.tag-br { color: var(--text-muted); font-weight: 400; }
+.foot-note { color: var(--text-muted); font-size: 11px; font-weight: 400; margin: 4px 2px 2px; }
+.more-link { margin: 6px 2px 0; font-size: 12px; }
+.col-rank { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Profile (label : value) table. */
+table.vis.profile th.pl {
+  background: var(--bg-th-left); text-align: left; white-space: nowrap;
+  width: 240px; border-right: 1px solid var(--border-secondary);
+  border-bottom: 1px solid var(--border-row); position: static;
+  color: var(--text-primary);
+}
+table.vis.profile td { font-variant-numeric: tabular-nums; }
+
+/* Main page two-column grid. */
+.main-grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.main-col { flex: 1 1 380px; min-width: 0; }
+
+/* Combined search results. */
+.search-results {
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  background: var(--bg-widget); margin: -4px 0 10px; padding: 4px;
+  max-height: 320px; overflow-y: auto;
+}
+.sr-group { margin-bottom: 6px; }
+.sr-head {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  padding: 3px 4px; border-bottom: 1px solid var(--border-row); margin-bottom: 2px;
+}
+.sr-item { padding: 3px 4px; font-size: 12px; }
+.sr-meta { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+
+/* Deltas. */
+.delta { font-variant-numeric: tabular-nums; font-weight: 700; }
+.delta-up { color: var(--delta-up); }
+.delta-down { color: var(--delta-down); }
+.delta-zero { color: var(--text-muted); font-weight: 400; }
+.pts-delta { font-size: 11px; }
+
+/* Sortable headers. */
+table.vis.sortable th.th-sort { cursor: pointer; user-select: none; }
+table.vis.sortable th.th-sort:hover { background: var(--btn-gradient-hover); }
+table.vis .arrow { color: var(--text-muted); font-size: 10px; }
+
+/* Charts. */
+.charts { display: flex; flex-wrap: wrap; gap: 10px; }
+.chart-box {
+  flex: 1 1 300px; border: 1px solid var(--border-secondary); border-radius: 3px;
+  background: var(--bg-widget); padding: 4px;
+}
+svg.chart { display: block; width: 100%; height: auto; }
+.chart-line { stroke-width: 1.5; }
+.chart-axis { stroke: var(--border-secondary); stroke-width: 1; }
+.chart-title { fill: var(--text-primary); font: 700 11px Verdana, Arial, sans-serif; }
+.chart-vlabel, .chart-dlabel { fill: var(--text-muted); font: 400 10px Verdana, Arial, sans-serif; }
+.chart-empty { fill: var(--text-muted); font: 400 12px Verdana, Arial, sans-serif; }
+
+/* ---- Phase 3 additions (tabs, interactive chart, village upgrades) ---- */
+
+/* Tabs (twstats profile/history/conquest tab bar). */
+.tabs { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 0 10px; border-bottom: 1px solid var(--border-secondary); }
+.tabs .tab {
+  padding: 5px 14px; border: 1px solid var(--border-tab); border-bottom: 0;
+  border-radius: 3px 3px 0 0; margin-bottom: -1px;
+  background: var(--btn-gradient); color: var(--text-primary);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.tabs .tab:hover { background: var(--btn-gradient-hover); }
+.tabs .tab.active { background: var(--bg-tab-active); border-bottom: 1px solid var(--bg-tab-active); }
+.tab-panel[hidden] { display: none; }
+
+/* Perfil layout: profile table left, evolution chart right (stacks narrow). */
+.profile-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.profile-wrap { flex: 1 1 420px; min-width: 0; }
+.profile-chart { flex: 1 1 380px; min-width: 0; }
+
+/* Interactive metric chart. */
+.metric-chart { border: 1px solid var(--border-secondary); border-radius: 3px; background: var(--bg-widget); padding: 6px; }
+.hist-chart .metric-chart { margin-bottom: 12px; }
+.chart-metrics { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-bottom: 6px; }
+.chart-metrics .cm-btn {
+  padding: 3px 9px; border: 1px solid var(--border-tab); border-radius: 3px;
+  background: var(--btn-gradient); color: var(--text-primary);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.chart-metrics .cm-btn:hover { background: var(--btn-gradient-hover); }
+.chart-metrics .cm-btn.active { background: var(--bg-tab-active); border-color: var(--border-secondary); }
+.chart-interactive { position: relative; }
+.chart-crosshair { stroke: var(--border-dark); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.chart-hoverdot { stroke: var(--bg-content); stroke-width: 1.5; pointer-events: none; }
+.chart-tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: var(--bg-widget-foot); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 3px 6px; font-size: 11px; white-space: nowrap;
+  box-shadow: 1px 1px 2px rgba(0,0,0,.3);
+}
+.chart-tip .tip-date { display: block; color: var(--text-muted); font-size: 10px; }
+.chart-tip .tip-val { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Info/disclaimer box (village "posibles mejoras"). */
+.info-box {
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  background: var(--bg-conquer-filter); color: var(--text-muted);
+  padding: 8px 10px; margin: 0 0 8px; font-size: 11px; font-weight: 400;
+}
+.info-box .info-i {
+  display: inline-block; font-weight: 700; font-style: italic;
+  color: var(--link-color); margin-right: 4px;
+}
+
+/* Village "Posibles mejoras" dropdown. */
+.col-mejora select.mejora-select {
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 2px 4px; font-family: Verdana, Arial, sans-serif; font-size: 11px;
+  max-width: 220px;
+}
+.col-mejora .mejora-count { color: var(--text-muted); font-weight: 400; font-size: 10px; }
+
+/* Widget boxes (main page). */
+.widget-box {
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  background: var(--bg-widget); overflow: hidden; margin-bottom: 12px;
+}
+.widget-box > .box-title.sub { margin: 0; border-radius: 0; border-width: 0 0 1px; }
+.widget-box .widget-body { padding: 8px; }
+.widget-box .table-wrap { border: 0; }
+.widget-box table.vis { border: 0; }
+.widget-box .more-link { margin: 0; padding: 6px 8px; background: var(--bg-widget-foot); border-top: 1px solid var(--border-row); }
+.search-box .widget-body input[type="search"] {
+  width: 100%; background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 6px 8px; font-family: Verdana, Arial, sans-serif; font-size: 13px;
+}
+.search-box .search-results { margin: 8px 0 0; }
+
+@media (max-width: 640px) {
+  .main-grid { flex-direction: column; }
+  table.vis.profile th.pl { width: 150px; }
+  .col-mejora select.mejora-select { max-width: 150px; }
+}
+
+/* "Entrantes" — incoming-attack fake checker (incomings.html). */
+.coord-form { align-items: flex-start; }
+.coord-form textarea {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 6px 8px; font-family: Consolas, "Courier New", monospace; font-size: 12px;
+}
+.conquer-filters label.chk {
+  display: flex; align-items: center; gap: 4px; color: var(--text-primary);
+  font-size: 11px; height: 22px; white-space: nowrap;
+}
+.conquer-filters label.chk input { margin: 0; }
+/* Row washes must out-specify the zebra rule (table.vis tr.r1 td). */
+:root { --bg-row-flagged: #f8dbd4; --bg-row-unknown: #e9ddc3; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { --bg-row-flagged: #3d1a15; --bg-row-unknown: #2a2013; }
+}
+:root[data-theme="dark"] { --bg-row-flagged: #3d1a15; --bg-row-unknown: #2a2013; }
+table.vis tr.row-flagged > td { background-color: var(--bg-row-flagged); }
+table.vis tr.row-unknown > td { background-color: var(--bg-row-unknown); }
+.flag {
+  display: inline-block; border-radius: 3px; padding: 1px 5px; margin: 1px 2px 1px 0;
+  font-size: 10px; font-weight: 700; border: 1px solid transparent; white-space: nowrap;
+}
+.flag-low { color: var(--delta-down); border-color: var(--delta-down); }
+.flag-new { color: var(--link-color); border-color: var(--border-secondary); }
+.flag-ok { color: var(--delta-up); border-color: transparent; font-weight: 400; }
+.flag-unknown { color: var(--text-muted); border-color: var(--border-light); font-weight: 400; }
+.col-verdict { white-space: normal; }
+.col-conq .conq-ago, .col-conq .conq-who { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+.flag-stale { color: var(--text-muted); border-color: var(--border-secondary); font-weight: 400; }
+.flag-after { color: var(--delta-down); border-color: var(--border-secondary); }
+table.vis tr.group-row > td {
+  background-color: var(--bg-bold); font-weight: 700; font-size: 11px;
+  border-top: 1px solid var(--border-secondary);
+}
+
+/* Entrantes: attack-mode panels, sortable headers, badges. */
+.panel {
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  background: var(--bg-widget); margin-bottom: 8px;
+}
+.panel > summary {
+  padding: 5px 8px; cursor: pointer; font-weight: 700; font-size: 12px;
+  background: var(--tw-header-gradient); border-radius: 2px;
+}
+.panel .panel-body { padding: 8px; }
+.panel .two-col, .panel-body.two-col { display: flex; flex-wrap: wrap; gap: 12px; }
+.panel .two-col > * { flex: 1 1 340px; min-width: 0; }
+.op-chart { display: block; width: 100%; max-width: 500px; border: 1px solid var(--border-secondary); background: #fff; }
+.op-table { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+.player-chip { display: inline-block; margin: 0 8px 3px 0; white-space: nowrap; }
+textarea.coord-dump {
+  width: 100%; box-sizing: border-box; background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px; padding: 4px 6px;
+  font-family: Consolas, "Courier New", monospace; font-size: 11px; resize: vertical;
+}
+table.vis.inner { border: 0; width: auto; }
+table.vis.inner td { border-bottom: 0; padding: 1px 6px 1px 0; background: none !important; }
+.filter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.filter-grid .f { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.filter-grid label { color: var(--text-muted); font-weight: 700; }
+.filter-grid select, .filter-grid input {
+  background: var(--bg-input); color: var(--text-primary); max-width: 100%;
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 4px 6px; font-family: Verdana, Arial, sans-serif; font-size: 12px;
+}
+.filter-actions { display: flex; gap: 6px; margin-top: 8px; }
+/* «Filtros de aviso» — one checkbox per flag class present in the rows. */
+.fflags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 12px; }
+.fflags-h { color: var(--text-muted); font-weight: 600; }
+.fflags .fflag { white-space: nowrap; cursor: pointer; }
+table.vis th.sortable { cursor: pointer; user-select: none; }
+table.vis th.sortable:hover { color: var(--link-hover); }
+table.vis th.sorted { text-decoration: underline; }
+.sort-arrow { font-size: 9px; }
+.as-badge {
+  display: inline-block; border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 0 3px; font-size: 10px; color: var(--text-muted); font-weight: 400;
+}
+.flag-type { color: var(--text-muted); border-color: var(--border-secondary); }
+.flag-noble { color: #fff; background: var(--delta-down); border-color: var(--delta-down); }
+.flag-train { color: var(--link-color); border-color: var(--border-secondary); }
+table.vis.own-villages td.zero { color: var(--text-muted); opacity: .5; }
+#warnLine { color: var(--delta-down); font-weight: 700; }
+@media (max-width: 640px) { .filter-grid { grid-template-columns: 1fr; } }
+.derived { font-style: italic; border-bottom: 1px dotted var(--border-dark); cursor: help; }
+.flag-nosent { color: var(--link-color); border-color: var(--border-secondary); }
+.flag-maybe { color: var(--link-color); border-color: var(--border-secondary); font-style: italic; }
+.flag-assumed { opacity: .85; border-style: dashed; }
+.flag-blindado { color: var(--delta-up); border-color: var(--delta-up); }
+.flag-esquivar { color: #fff; background: #b25a00; border-color: #b25a00; }
+.flag-media { color: var(--text-muted); border-color: var(--border-secondary); }
+.flag-nuke { color: #fff; background: var(--delta-down); border-color: var(--delta-down); }
+/* Known catapult striker (≥50 catas without a regular ram off) — purple, per the user. */
+.flag-catas { color: #fff; background: #6d3f8e; border-color: #6d3f8e; }
+/* Troops confirmed dead in battle (💀) — dark blood-red, distinct from nuke's red. */
+.flag-dead { color: #fff; background: #7a1f1f; border-color: #7a1f1f; }
+/* Bonus-village icon (barracks/stable/workshop/farm), inline after the name. */
+.bonus-ic { width: 14px; height: 14px; vertical-align: -2px; }
+.note-badge {
+  display: inline-block; border-radius: 3px; padding: 0 4px; font-size: 10px; font-weight: 700;
+  border: 1px solid var(--border-secondary); color: var(--text-muted);
+}
+.note-off { color: #fff; background: #8a3b00; border-color: #8a3b00; }
+.note-def { color: #fff; background: #1a5e7a; border-color: #1a5e7a; }
+.note-mixed { color: #fff; background: #5e4a7a; border-color: #5e4a7a; }
+.note-empty { color: var(--text-muted); border-color: var(--border-secondary); }
+/* Reports-DB verdict with the away troops never seen ("DEF?"): visibly tentative. */
+.note-unsure { border-style: dashed; opacity: .8; }
+.rep-share-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+/* Subir Informes paste box (2026-08-06). */
+#repPasteWrap { margin: 6px 0; }
+#repPaste { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px; }
+.flag-notedef { color: var(--link-color); border-color: var(--link-color); }
+
+/* Aviso badges are long sentences, not chips: inside that column they must wrap
+   instead of running past the table edge. `.flag` keeps nowrap everywhere else
+   (Tropa, trains), where the labels are short. */
+.col-verdict .flag { white-space: normal; }
+.col-verdict { min-width: 210px; }
+table.vis th.col-verdict { white-space: normal; }
+
+/* Reports-DB intel recorded under a PREVIOUS owner: shown, never trusted. */
+.note-old { color: var(--text-muted); border-color: var(--border-secondary); opacity: .75; }
+
+/* Units from the optional «.json Órdenes» upload (incomingOrders exporter):
+   the real army inside a matched command + the game's size icon, rendered as
+   a second line inside the Tropa cell. */
+.ord-units { display: inline-flex; flex-wrap: wrap; gap: 7px; margin-top: 3px; align-items: center; }
+.ord-unit { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; white-space: nowrap; }
+.ord-ic { width: 15px; height: 15px; vertical-align: middle; }
+.ord-size { width: 14px; height: 14px; }
+
+/* CATAS village tag — purple, sits next to the 📄OFF/DEF badge. */
+.note-catas { color: #fff; background: #6d3f8e; border-color: #6d3f8e; }
+
+/* === report hover card (📄 badges, Entrantes) ============================
+   twstats' take on the tribe-calculator map hover: verdict header, troop
+   sections with power lines + unit chips, spied building levels. */
+.note-badge[data-rc] { cursor: pointer; }
+.report-card {
+  position: absolute; z-index: 50; display: none; pointer-events: none;
+  max-width: 330px; padding: 8px 10px; font-size: 12px; line-height: 1.45;
+  background: var(--bg-widget); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+}
+.report-card .rc-head { font-weight: 700; }
+.report-card .rc-age { color: var(--text-muted); font-weight: 400; }
+.report-card .rc-sub { color: var(--text-muted); margin-top: 2px; }
+.report-card .rc-old { color: var(--text-muted); font-weight: 700; }
+.report-card .rc-sec { margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--border-tab); }
+.report-card .rc-h { font-weight: 600; color: var(--link-color); margin-bottom: 2px; }
+.report-card .rc-row { display: flex; justify-content: space-between; gap: 14px; }
+.report-card .rc-k { color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px; }
+.report-card .rc-units { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 3px; }
+.report-card .rc-unit { display: inline-flex; align-items: center; gap: 2px; }
+.report-card .rc-ic { width: 15px; height: 15px; vertical-align: middle; }
+.report-card .rc-none, .report-card .rc-unk { color: var(--text-muted); font-style: italic; }
+.report-card .rc-empty { color: var(--delta-up); }
+.report-card .rc-catas { color: #b07fd0; font-weight: 600; }
+.report-card .rc-dead { color: #d05050; font-weight: 600; }
+.report-card .rc-lv0 { color: var(--text-muted); }
+
+/* === in-game report render (report-render.js: .twrr) =====================
+   Deliberately FIXED in-game colors (tan parchment, brown chrome) in both
+   site themes — the report is a game artifact, like an embedded screenshot. */
+.twrr {
+  max-width: 420px; background: #f4e4bc; color: #000;
+  border: 1px solid #7d510f; border-radius: 3px; padding: 6px;
+  font: 12px/1.4 Verdana, Arial, sans-serif;
+}
+.twrr table { border-collapse: collapse; width: 100%; }
+.twrr th { background: #c1a264; color: #000; text-align: left; font-weight: 700; padding: 2px 5px; border: 1px solid #dbc59c; }
+.twrr td { padding: 2px 5px; border: 1px solid #dbc59c; background: #fff5da; }
+.twrr h4 { margin: 6px 0 3px; padding: 0; font-size: 12px; color: #5d3a10; font-style: italic; }
+.twrr-head th { width: 110px; }
+.twrr-sec { margin-top: 6px; }
+.twrr-side { margin-top: 8px; }
+.twrr-who th { width: 110px; }
+.twrr-units td { text-align: center; min-width: 24px; padding: 2px 3px; }
+.twrr-units img { width: 18px; height: 18px; vertical-align: middle; }
+.twrr-units .twrr-label { text-align: left; font-weight: 700; background: #ded3b9; min-width: 70px; }
+.twrr-units .twrr-z { color: #a9a9a9; }
+.twrr-luckmoral h4 { display: inline-block; margin-right: 14px; }
+.twrr-luckwrap { display: inline-flex; align-items: center; gap: 8px; margin-right: 14px; }
+.twrr-lucknum { font-weight: 700; }
+.twrr-luckbar { position: relative; width: 100px; height: 12px; background: #fff5da; border: 1px solid #7d510f; }
+.twrr-luck-seg { position: absolute; top: 0; bottom: 0; }
+.twrr-luck-pos { background: #92c05c; }
+.twrr-luck-neg { background: #e04545; }
+.twrr-luck-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #7d510f; }
+.twrr-esp { border-top: 1px solid #7d510f; padding-top: 5px; }
+.twrr-resrow th { width: 130px; }
+.twrr-res { width: 14px; height: 14px; vertical-align: -2px; }
+.twrr-resitem { margin-right: 12px; white-space: nowrap; }
+.twrr-bldcols { display: flex; gap: 6px; align-items: flex-start; margin-top: 4px; }
+.twrr-bld th:last-child, .twrr-bld td:last-child { width: 38px; text-align: right; }
+.twrr-bld img { width: 16px; height: 16px; vertical-align: middle; margin-right: 2px; }
+.twrr-away th { border-bottom: 0; }
+
+/* modal wrapper for the Entrantes badge-click (site-themed chrome, game card inside) */
+.twrr-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 90; display: flex; align-items: flex-start; justify-content: center; padding: 40px 10px; overflow: auto; }
+.twrr-modal { background: var(--bg-content); border: 1px solid var(--border-primary); border-radius: 6px; padding: 10px; max-width: 460px; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+.twrr-modal-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; color: var(--text-primary); font-weight: 700; }
+.twrr-modal-close { cursor: pointer; border: 1px solid var(--border-secondary); background: var(--btn-gradient); border-radius: 4px; padding: 1px 9px; font-size: 14px; }
+.twrr-modal .twrr + .twrr-srchead { margin-top: 12px; }
+.twrr-srchead { color: var(--text-muted); font-size: 12px; margin: 2px 0 4px; }
+
+/* Subir Informes viewer list */
+.twrr-list { margin-top: 8px; }
+.twrr-item { border: 1px solid var(--border-secondary); border-radius: 4px; margin-bottom: 4px; }
+.twrr-item > summary { cursor: pointer; padding: 4px 8px; background: var(--bg-widget-row); border-radius: 4px; }
+.twrr-item[open] > summary { border-bottom: 1px solid var(--border-secondary); }
+.twrr-item .twrr { margin: 8px; }

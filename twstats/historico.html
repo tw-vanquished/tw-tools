@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Histórico Informes</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Histórico Informes
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <div class="info-box">
+      <span class="info-i">i</span>
+      Todos los informes de la <b>base de datos compartida</b>, del más nuevo al más antiguo
+      (los reenviados se deduplican solos). Escribe una coordenada para ver el historial
+      completo de un pueblo — aparecen tanto los informes donde es <b>defensor</b> como
+      donde es <b>origen del ataque</b>. Pulsa un informe para verlo como en el juego.
+    </div>
+
+    <div class="rep-share-row">
+      <input type="text" id="histCoord" inputmode="numeric" autocomplete="off"
+        placeholder="Filtrar por coordenada — ej. 500|500" size="28">
+      <button type="button" class="seg" id="histClear">Limpiar</button>
+      <span id="histStatus" class="tz-note"></span>
+    </div>
+
+    <p class="meta-line" id="histLine">Cargando el histórico…</p>
+
+    <div id="histList" class="twrr-list"></div>
+    <div class="rep-share-row" id="histMoreWrap" hidden>
+      <button type="button" class="seg" id="histMore">Mostrar más</button>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <!-- Versioned query: Pages serves css/ and js/ with Cache-Control: max-age=600.
+       Bump ?v=20260826.1 on EVERY asset change, site-wide; the token is shared by all
+       twstats pages. -->
+  <script src="js/common.js?v=20260826.1"></script>
+  <!-- The calculator's pure reports-intel module (riAge here) — same file the
+       calculator and Entrantes use. -->
+  <script src="../js/reports-intel.js?v=20260826.1"></script>
+  <script src="../js/report-render.js?v=20260826.1"></script>
+  <script src="js/historico.js?v=20260826.1"></script>
+</body>
+</html>

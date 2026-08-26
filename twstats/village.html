@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>es103 · Pueblo</title>
+  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+</head>
+<body>
+  <div id="main">
+    <div class="box-title">
+      Guerras Tribales Estadísticas <span class="sep">:</span> Mundo <span id="worldName">es103</span>
+      <span class="sep">:</span> Pueblo
+    </div>
+
+    <nav class="mainnav" aria-label="Views"></nav>
+
+    <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). El historial de evolución comienza el 2026-06-11 (inicio del registro).</p>
+    <p id="status" class="status">Cargando…</p>
+
+    <div id="content" hidden>
+      <h3 id="pageTitle">Historial del pueblo</h3>
+
+      <div class="profile-row">
+        <div class="profile-wrap">
+          <div class="box-title sub">Perfil</div>
+          <div class="table-wrap">
+            <table class="vis widget profile"><tbody id="profileBody"></tbody></table>
+          </div>
+          <p class="foot-note">* desde 2026-06-11 (inicio del registro): el archivo no cubre la vida completa del mundo.</p>
+        </div>
+        <div class="profile-chart">
+          <div class="box-title sub">Gráfica</div>
+          <div id="charts" class="charts"></div>
+        </div>
+      </div>
+
+      <div class="box-title sub">Historial de puntos</div>
+      <p class="info-box"><span class="info-i">i</span> Las «posibles mejoras» son
+        conjeturas inferidas del incremento de puntos, asumiendo colas de construcción
+        constantes. Un salto grande puede ser de varios edificios a la vez (→
+        «Desconocido»).</p>
+      <div class="table-wrap">
+        <table class="vis widget">
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th>
+              <th class="col-pts">Puntos</th>
+              <th class="col-pts">Cambio</th>
+              <th class="col-pts">Tiempo</th>
+              <th>Posibles mejoras</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+
+      <div class="box-title sub">Historial de conquistas <span id="conqCount" class="count"></span></div>
+      <div class="table-wrap">
+        <table class="vis widget">
+          <thead>
+            <tr>
+              <th class="c-date">Fecha/Tiempo</th>
+              <th class="c-new">Nuevo dueño</th>
+              <th class="c-old">Antiguo dueño</th>
+            </tr>
+          </thead>
+          <tbody id="conquestsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="foot">Datos archivados del mundo es103. No oficial.</p>
+  </div>
+
+  <script src="js/common.js?v=20260826.1"></script>
+  <script src="js/building-points.js?v=20260826.1"></script>
+  <script src="js/chart.js?v=20260826.1"></script>
+  <script src="js/village.js?v=20260826.1"></script>
+</body>
+</html>
