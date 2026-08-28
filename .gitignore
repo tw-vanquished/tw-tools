@@ -1,0 +1,3 @@
+# Local tooling session state — never publish
+.omc/
+.claude/
