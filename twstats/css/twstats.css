@@ -325,6 +325,14 @@ svg.chart { display: block; width: 100%; height: auto; }
 
 /* "Entrantes" — incoming-attack fake checker (incomings.html). */
 .coord-form { align-items: flex-start; }
+/* Quickbar loader shown on Subir Informes: one line, click-to-select, no resize. */
+.quickbar-snippet {
+  display: block; width: 100%; box-sizing: border-box; margin: 6px 0 2px; padding: 5px 8px;
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  font-family: Consolas, "Courier New", monospace; font-size: 11px; line-height: 1.4;
+  resize: none; white-space: pre; overflow-x: auto; cursor: text;
+}
 .coord-form textarea {
   width: 100%; box-sizing: border-box; resize: vertical;
   background: var(--bg-input); color: var(--text-primary);
