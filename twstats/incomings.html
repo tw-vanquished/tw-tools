@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>es103 · Entrantes</title>
-  <link rel="stylesheet" href="css/twstats.css?v=20260826.1">
+  <link rel="stylesheet" href="css/twstats.css?v=20260829.1">
 </head>
 <body>
   <div id="main">
@@ -38,10 +38,10 @@
       <span class="flag flag-blindado">Blindado</span> si aguanta de sobra, y
       <span class="flag flag-esquivar">Esquivar</span> si está sin defensa o es un pueblo
       ofensivo (ahí lo que interesa es sacar las tropas). Ambos umbrales se ajustan arriba.
-      <br><b>Opcional:</b> con «.json Órdenes» puedes subir el
+      <span id="ordersHelp"><br><b>Opcional:</b> con «.json Órdenes» puedes subir el
       <code>incoming_orders*.json</code> del script exportador de órdenes — cada ataque
       que coincida (objetivo + origen + hora de llegada exacta) muestra además las
-      <b>unidades reales</b> del comando y su <b>tamaño</b> (el icono del juego).
+      <b>unidades reales</b> del comando y su <b>tamaño</b> (el icono del juego).</span>
     </div>
 
     <form class="conquer-filters" id="filters" onsubmit="return false">
@@ -134,13 +134,13 @@
   <!-- Versioned query: Pages serves css/ and js/ with Cache-Control: max-age=600,
        so a returning visitor can otherwise run a stale common.js (one that
        predates TW.srvEpoch broke this page outright) or a stale stylesheet that
-       lacks the newer badge styles. Bump ?v=20260826.1 on EVERY asset change, site-wide;
+       lacks the newer badge styles. Bump ?v= on EVERY asset change, site-wide;
        the token is shared by all twstats pages. -->
-  <script src="js/common.js?v=20260826.1"></script>
+  <script src="js/common.js?v=20260829.1"></script>
   <!-- The calculator's pure reports-intel module (riClassify/riStale/riAge) —
        the SAME file tribe-calculator ships, so twstats verdicts can't drift. -->
-  <script src="../js/reports-intel.js?v=20260826.1"></script>
-  <script src="../js/report-render.js?v=20260826.1"></script>
-  <script src="js/incomings.js?v=20260826.1"></script>
+  <script src="../js/reports-intel.js?v=20260829.1"></script>
+  <script src="../js/report-render.js?v=20260829.1"></script>
+  <script src="js/incomings.js?v=20260829.1"></script>
 </body>
 </html>

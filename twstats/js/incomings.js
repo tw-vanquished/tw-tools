@@ -413,6 +413,16 @@
     return attacks;
   }
 
+  // === «.json Órdenes» availability — THE ONE deliberate divergence =========
+  // Every twstats deployment (one per world) runs this same file; apart from
+  // the world id / ?v= token / protected-allies lines the copies must stay
+  // byte-identical (a sync test in the source repo enforces it). This function
+  // is the only place two deployments are ALLOWED to differ: a world that keeps
+  // the optional incoming_orders*.json upload returns true; one that ships
+  // without it returns false — then the button, the help sentence, the note
+  // line and the «Filtros de órdenes» row never appear and no orders code runs.
+  function ordersFeatureEnabled() { return false; }
+
   // === órdenes .json (incomingOrders exporter, optional) ===================
   // The BB dump never carries the army inside a command — the incomingOrders
   // userscript export does (real per-unit counts + the game's small/medium/
@@ -471,6 +481,7 @@
   // sorting/filtering re-renders don't re-match) and surface the tally. Runs
   // after every analysis and again when a .json is uploaded mid-session.
   function matchOrders() {
+    if (!ordersFeatureEnabled()) return;   // nothing to match, nothing to show
     var el = $("ordersNote");
     if (!state.orders) { el.hidden = true; buildOrdersFilters(); return; }
     var total = 0, matched = 0;
@@ -1960,7 +1971,7 @@
     TW.renderNav("entrantes");
 
     // This page needs a common.js new enough to have TW.srvEpoch AND
-    // TW.apiFetch. The ?v=20260826.1 on the script tags should guarantee that, but a
+    // TW.apiFetch. The ?v= on the script tags should guarantee that, but a
     // proxy or an odd cache can still pair a new incomings.js with an old
     // common.js — fail loudly, not silently.
     if (typeof TW.srvEpoch !== "function" || typeof TW.apiFetch !== "function") {
@@ -2009,6 +2020,14 @@
     });
     // «.json Órdenes» — optional incoming_orders*.json upload. The file never
     // leaves the browser; parse errors report themselves in the note line.
+    // Sites without the feature (ordersFeatureEnabled false) hide its UI here
+    // instead of editing the HTML, so the markup stays shared too.
+    if (!ordersFeatureEnabled()) {
+      ["ordersBtn", "ordersFile", "ordersNote", "ordersHelp"].forEach(function (id) {
+        var el = $(id);
+        if (el) el.hidden = true;
+      });
+    }
     $("ordersBtn").addEventListener("click", function () { $("ordersFile").click(); });
     $("ordersFile").addEventListener("change", function () {
       var f = this.files && this.files[0];
