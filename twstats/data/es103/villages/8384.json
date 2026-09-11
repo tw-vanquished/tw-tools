@@ -1,1 +1,1 @@
-{"profile":{"id":"8384","name":"pueblo de Irene","x":450,"y":432,"k":44,"points":128,"owner":{"id":"2117545","name":"Irene","tribe":null},"firstSeen":1789142877,"lastConquest":null,"conquestCount":0},"series":[{"t":1789142877,"points":128}],"conquests":[]}
+{"profile":{"id":"8384","name":"pueblo de Irene","x":450,"y":432,"k":44,"points":149,"owner":{"id":"2117545","name":"Irene","tribe":{"id":"171","tag":"TaR"}},"firstSeen":1789142877,"lastConquest":null,"conquestCount":0},"series":[{"t":1789142877,"points":128},{"t":1789146480,"points":149}],"conquests":[]}
