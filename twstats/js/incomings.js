@@ -52,6 +52,7 @@
   var state = {
     ready: null,        // Promise resolved when both datasets are indexed
     byCoord: {},        // "x|y" -> village record {id,name,x,y,points,owner}
+    playerIdByName: {}, // attacker name -> player id learned from villages.json (resolvePlayers)
     lastConquer: {},    // village id -> {t, oldOwner, newOwner}
     cfg: null,          // world config (speeds, attack_gap, snob max_dist)
     mode: "coords",     // "coords" | "attacks"
@@ -217,6 +218,12 @@
   // so ANY ONE of {sent, duration, return} plus the arrival gives the rest.
   var ATTACK_LINE_RE = /\[command\]attack\[\/command\]/i;
   var RE_LABEL = /\[command\]attack\[\/command\]\s*(.*?)\s*(?:\||\[coord\])/i;
+  // Attacker name — a ladder (2026-09-19). The game appends a
+  // [player]…[/player] tag to EVERY exported command, independent of the
+  // label template, so it wins; the "| player X |" label field is what the
+  // default rename template writes and only exists when the defender kept it.
+  // Neither present → resolved later from world data (see resolvePlayers).
+  var RE_PLAYER_TAG = /\[player\]([^\[\]]+?)\[\/player\]/i;
   var RE_PLAYER = /\|\s*player\s+(.+?)\s+\|/i;
   var RE_SENT = /\bsent\s+(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?\s+(\d{1,2}):(\d{2}):(\d{2})/i;
   var RE_RETURN = /\breturn\s+(\d{1,2})\.(\d{1,2})\.?(\d{2,4})?\s+(\d{1,2}):(\d{2}):(\d{2})/i;
@@ -285,10 +292,12 @@
           inconsistent++;
         }
 
-        var lm = RE_LABEL.exec(line), pm = RE_PLAYER.exec(line);
+        var lm = RE_LABEL.exec(line), pm = RE_PLAYER.exec(line), tm = RE_PLAYER_TAG.exec(line);
+        var playerName = tm ? tm[1].trim() : (pm ? pm[1].trim() : "");
         out.push({
           label: lm ? lm[1] : "",
-          player: pm ? pm[1].trim() : "?",
+          player: playerName || "?",
+          playerSource: playerName ? (tm ? "tag" : "label") : null,
           origin: { key: Number(origin[1]) + "|" + Number(origin[2]), x: Number(origin[1]), y: Number(origin[2]) },
           target: cur,
           sent: sent,
@@ -327,7 +336,34 @@
   }
 
   // === derived attack facts ================================================
+  // Attacker unknown from the dump (no [player] tag, label template without
+  // "| player X |") → the OWNER of the origin village in villages.json. A
+  // barbarian village can't attack, so an origin always has an owner; the one
+  // guard is a conquest AFTER the launch: the sender was then the OLD owner
+  // (conquers.json keeps both sides). Names that DID come from the dump are
+  // used to learn the player id from the same record, so the totals can link
+  // straight to the profile instead of going through players.json by name.
+  function resolvePlayers(attacks) {
+    attacks.forEach(function (a) {
+      var v = state.byCoord[a.origin.key];
+      var owner = v && v.owner && v.owner.id != null && v.owner.name ? v.owner : null;
+      var lc = v && state.lastConquer[v.id];
+      if (owner && lc && a.sent != null && lc.t > a.sent && lc.oldOwner && lc.oldOwner.name) {
+        owner = lc.oldOwner; // launched before the conquest → previous owner
+      }
+      if (!owner) return;
+      if (!a.playerSource) {
+        a.player = owner.name;
+        a.playerSource = "world";
+      }
+      if (a.player === owner.name) {
+        state.playerIdByName[owner.name] = String(owner.id);
+      }
+    });
+  }
+
   function enrichAttacks(attacks) {
+    resolvePlayers(attacks);
     // distance + troop class
     attacks.forEach(function (a) {
       if (a.target && a.durationMin != null) {
@@ -1407,11 +1443,16 @@
       .sort(function (a, b) { return b[1] - a[1] || String(a[0]).localeCompare(String(b[0])); });
   }
 
-  // Attacker names are resolved to real profile links through players.json when
-  // possible (the dump carries no player ids).
+  // Attacker names are resolved to real profile links: through the origin
+  // village's owner record when resolvePlayers learned it, else players.json by
+  // name (the dump carries no player ids).
   function playerLinkByName(name) {
-    var p = state.playersByName && state.playersByName[name];
-    return p ? TW.playerLink(p.id, name) : TW.esc(name);
+    var id = state.playerIdByName[name];
+    if (id == null) {
+      var p = state.playersByName && state.playersByName[name];
+      if (p) id = p.id;
+    }
+    return id != null ? TW.playerLink(id, name) : TW.esc(name);
   }
 
   function buildTotals(attacks) {
@@ -1420,8 +1461,15 @@
     var dests = sortedEntries(countBy(attacks, function (a) { return a.target ? a.target.key : null; }));
     var types = sortedEntries(countBy(attacks, function (a) { return a.speed ? a.speed.label : "?"; }));
 
+    // A name the dump never stated (taken from the origin's owner) is marked
+    // like the derived times: italic + dotted, with the reason on hover.
+    var inferred = countBy(attacks.filter(function (a) { return a.playerSource === "world"; }),
+      function (a) { return a.player; });
     var playersHtml = players.map(function (e) {
-      return '<span class="player-chip">' + playerLinkByName(e[0]) + " <b>(" + e[1] + ")</b></span>";
+      var n = inferred[e[0]] || 0;
+      var cls = n ? ' class="player-chip derived" title="Nombre deducido del dueño del pueblo de origen (' +
+        n + " de " + e[1] + (e[1] === 1 ? " ataque" : " ataques") + ' sin jugador en el texto)"' : ' class="player-chip"';
+      return "<span" + cls + ">" + playerLinkByName(e[0]) + " <b>(" + e[1] + ")</b></span>";
     }).join(" ");
 
     var typesHtml = types.map(function (e) {
