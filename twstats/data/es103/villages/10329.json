@@ -1,1 +1,1 @@
-{"profile":{"id":"10329","name":"Moscú","x":544,"y":505,"k":55,"points":164,"owner":{"id":"2181688","name":"Zhukov","tribe":null},"firstSeen":1790093287,"lastConquest":null,"conquestCount":0},"series":[{"t":1790093287,"points":164}],"conquests":[]}
+{"profile":{"id":"10329","name":"Moscú","x":544,"y":505,"k":55,"points":199,"owner":{"id":"2181688","name":"Zhukov","tribe":{"id":"181","tag":"LCI2"}},"firstSeen":1790093287,"lastConquest":null,"conquestCount":0},"series":[{"t":1790093287,"points":164},{"t":1790104082,"points":199}],"conquests":[]}
