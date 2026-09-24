@@ -222,16 +222,35 @@
   // Function in front of the SAME Worker (service binding, responses
   // byte-identical) on an unaffected range, so it goes first; workers.dev
   // stays as the fallback for the day pages.dev is the blocked one. Only
-  // NETWORK failures fail over — an HTTP error is the Worker answering,
-  // and it would answer the same on either host.
+  // NETWORK failures (and hangs — see below) fail over — an HTTP error is the
+  // Worker answering, and it would answer the same on either host.
   var API_HOSTS = [
     "https://tw-calc-proxy.pages.dev",
     "https://tw-calc-uploads.gdqshd.workers.dev",
   ];
+  // A host that never ANSWERS (seen 2026-09-24: pages.dev held a 1 KB index
+  // request open for 90 s while both hosts answered a fresh call in <1 s) is
+  // failed over too: each attempt gets API_TIMEOUT_MS via AbortController,
+  // and a timeout counts as a network failure. The caller's own opts.signal
+  // still aborts everything. TW.API_TIMEOUT_MS is read at call time (tests).
+  var API_TIMEOUT_MS = 20000;
   function apiFetch(pathQuery, opts) {
+    var limit = (window.TW && +window.TW.API_TIMEOUT_MS) || API_TIMEOUT_MS;
     function attempt(i) {
-      return fetch(API_HOSTS[i] + pathQuery, opts).catch(function (e) {
-        return i + 1 < API_HOSTS.length ? attempt(i + 1) : Promise.reject(e);
+      var ctl = typeof AbortController === "function" ? new AbortController() : null;
+      var timedOut = false;
+      var timer = ctl && setTimeout(function () { timedOut = true; ctl.abort(); }, limit);
+      if (ctl && opts && opts.signal) opts.signal.addEventListener("abort", function () { ctl.abort(); });
+      var o = opts ? Object.assign({}, opts) : {};
+      if (ctl) o.signal = ctl.signal;
+      return fetch(API_HOSTS[i] + pathQuery, o).then(function (r) {
+        if (timer) clearTimeout(timer);
+        return r;
+      }, function (e) {
+        if (timer) clearTimeout(timer);
+        if (opts && opts.signal && opts.signal.aborted) return Promise.reject(e); // the caller gave up
+        var err = timedOut ? new Error("sin respuesta en " + Math.round(limit / 1000) + " s") : e;
+        return i + 1 < API_HOSTS.length ? attempt(i + 1) : Promise.reject(err);
       });
     }
     return attempt(0);
