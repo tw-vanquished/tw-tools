@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TW Attack Planner</title>
+  <link rel="stylesheet" href="css/attack-planner.css">
+</head>
+<body>
+
+<!-- ══════════════════ HEADER ══════════════════ -->
+<div class="header">
+  <h1>⚔ Tribalwars — Attack Planner</h1>
+  <div class="header-right">
+    <div class="setting-group">
+      <label data-i18n="lang_label">Lang</label>
+      <div style="display:flex;gap:3px">
+        <button id="lang-btn-en" class="btn btn-sm lang-btn lang-active" onclick="changeLang('en')"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect width='60' height='40' fill='%23012169'/%3E%3Cpath d='M0,0 L60,40 M60,0 L0,40' stroke='%23fff' stroke-width='8'/%3E%3Cpath d='M0,0 L60,40 M60,0 L0,40' stroke='%23C8102E' stroke-width='4'/%3E%3Cpath d='M30,0 V40 M0,20 H60' stroke='%23fff' stroke-width='12'/%3E%3Cpath d='M30,0 V40 M0,20 H60' stroke='%23C8102E' stroke-width='8'/%3E%3C/svg%3E" width="20" height="14" alt="" style="border-radius:2px"> EN</button>
+        <button id="lang-btn-es" class="btn btn-sm lang-btn" onclick="changeLang('es')"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect width='60' height='40' fill='%23C60B1E'/%3E%3Crect y='10' width='60' height='20' fill='%23FFC400'/%3E%3C/svg%3E" width="20" height="14" alt="" style="border-radius:2px"> ES</button>
+      </div>
+    </div>
+    <div class="setting-group">
+      <label data-i18n="lbl_server">Server</label>
+      <input type="text" id="cfg-server" value="es103.guerrastribales.es" placeholder="es103.guerrastribales.es">
+    </div>
+    <div class="setting-group">
+      <label data-i18n="lbl_world_speed">World Speed</label>
+      <input type="number" id="cfg-ws" value="2" min="0.1" max="10" step="0.1">
+    </div>
+    <div class="setting-group">
+      <label data-i18n="lbl_unit_speed">Unit Speed</label>
+      <input type="number" id="cfg-us" value="0.5" min="0.1" max="2" step="0.1">
+    </div>
+    <div class="setting-group">
+      <label data-i18n="lbl_my_player">My Player</label>
+      <input type="text" id="cfg-player" placeholder="Vanquished" style="width:130px">
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ FILE BAR ══════════════════ -->
+<div class="file-bar">
+  <div class="file-status-dot dot-off" id="file-dot"></div>
+  <span id="file-status-text" data-i18n="file_not_connected">No file connected</span>
+  <div class="file-bar-actions">
+    <button class="btn btn-file btn-sm" onclick="connectFile()" data-i18n="btn_connect_file">⟁ Connect File</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportJson()" data-i18n="btn_export">↓ Export</button>
+    <button class="btn btn-ghost btn-sm" onclick="importJson()" data-i18n="btn_import">↑ Import</button>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="handleImport(event)">
+  </div>
+</div>
+
+<!-- ══════════════════ TABS ══════════════════ -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('plan')" data-i18n="tab_attack_plan">⚔ Attack Plan</div>
+  <div class="tab" onclick="switchTab('villages')" data-i18n="tab_my_villages">🏰 My Villages</div>
+  <div class="tab" onclick="switchTab('targets')" data-i18n="tab_targets">🎯 Targets</div>
+  <div class="tab" onclick="switchTab('scavenge')" data-i18n="tab_scavenge">🌾 Scavenging</div>
+  <div class="tab" onclick="switchTab('db')" data-i18n="tab_village_db">🗃 Village DB</div>
+  <div class="tab" onclick="switchTab('guide')" data-i18n="tab_guide">📖 Guide</div>
+</div>
+
+<!-- ══════════════════ TAB: ATTACK PLAN ══════════════════ -->
+<div class="tab-content active" id="tab-plan">
+  <div class="section-header">
+    <h2 data-i18n="tab_attack_plan">Attack Plan</h2>
+    <div class="section-header-actions">
+      <button class="btn btn-ghost btn-sm" onclick="exportToNotepad()" data-i18n="btn_export_notepad">📋 Export BB Code</button>
+      <button class="btn btn-danger btn-sm" onclick="clearAllAttacks()" data-i18n="btn_clear_all">🗑 Clear All</button>
+      <button class="btn btn-danger btn-sm" onclick="clearSent()" data-i18n="btn_clear_sent">🗑 Clear Sent</button>
+      <button class="btn btn-ghost btn-sm" onclick="openAutoGenerate()" data-i18n="btn_auto_generate">⚡ Auto-Generate</button>
+      <button class="btn btn-primary" onclick="togglePanel('add-attack-panel')" data-i18n="btn_add_attack">+ Add Attack</button>
+    </div>
+  </div>
+
+  <div class="form-panel" id="add-attack-panel">
+    <h3 data-i18n="sec_new_attack">New Attack</h3>
+    <div class="form-grid wide">
+      <div class="form-group">
+        <label data-i18n="lbl_from_village">From Village</label>
+        <select id="aa-from"></select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_target">Target</label>
+        <select id="aa-target"></select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_type">Type</label>
+        <select id="aa-type" onchange="onAttackTypeChange('aa-noble-row')">
+          <option value="off" data-i18n="opt_off">Off (Rams)</option>
+          <option value="fake" data-i18n="opt_fake">Fake (1 spy/1 ram)</option>
+          <option value="snob" data-i18n="opt_snob">Snob (Nobleman)</option>
+        </select>
+      </div>
+      <div class="form-group hidden" id="aa-noble-row">
+        <label data-i18n="lbl_noble_count">Noble Count</label>
+        <input type="number" id="aa-nobles" value="1" min="1" max="4">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_speed">Speed (timing)</label>
+        <select id="aa-speed">
+          <option value="" data-i18n="opt_speed_auto">Auto (by type)</option>
+          <option value="axe" data-i18n="opt_speed_axe">Axe (18)</option>
+          <option value="sword" data-i18n="opt_speed_sword">Sword (22)</option>
+          <option value="lc" data-i18n="opt_speed_lc">Light Cavalry (10)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_landing_time">Landing Time</label>
+        <input type="datetime-local" id="aa-landing" step="1">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addAttack()" data-i18n="btn_add_attack">Add Attack</button>
+      <button class="btn btn-ghost" onclick="togglePanel('add-attack-panel')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="attack-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="setAttackSort('from')" data-i18n="lbl_from">From <span class="sort-icon" id="si-from"></span></th>
+          <th class="sortable" onclick="setAttackSort('target')" data-i18n="lbl_target">Target <span class="sort-icon" id="si-target"></span></th>
+          <th class="sortable" onclick="setAttackSort('villageName')" data-i18n="lbl_village_name">Village Name <span class="sort-icon" id="si-villageName"></span></th>
+          <th class="sortable" onclick="setAttackSort('playerName')" data-i18n="lbl_player">Player <span class="sort-icon" id="si-playerName"></span></th>
+          <th class="sortable" onclick="setAttackSort('type')" data-i18n="lbl_type">Type <span class="sort-icon" id="si-type"></span></th>
+          <th class="sortable" onclick="setAttackSort('offPow')" data-i18n="lbl_off_power">Off Power <span class="sort-icon" id="si-offPow"></span></th>
+          <th class="sortable" onclick="setAttackSort('building')" data-i18n="lbl_building" data-i18n-title="lbl_building_title" title="Catapult target building (pick it on the confirm screen)">Building <span class="sort-icon" id="si-building"></span></th>
+          <th class="sortable" onclick="setAttackSort('dist')" data-i18n="lbl_dist">Dist <span class="sort-icon" id="si-dist"></span></th>
+          <th class="sortable" onclick="setAttackSort('travel')" data-i18n="lbl_travel">Travel <span class="sort-icon" id="si-travel"></span></th>
+          <th class="sortable" onclick="setAttackSort('landing')" data-i18n="lbl_landing">Landing <span class="sort-icon" id="si-landing"></span></th>
+          <th class="sortable" onclick="setAttackSort('sendAt')" data-i18n="lbl_send_at">Send At <span class="sort-icon" id="si-sendAt"></span></th>
+          <th data-i18n="lbl_countdown">Countdown</th>
+          <th data-i18n="lbl_attack">Attack</th>
+          <th data-i18n="lbl_actions">Actions</th>
+        </tr>
+        <tr class="filter-row">
+          <th><input class="col-filter" id="af-from" oninput="renderAttacks()" data-i18n-placeholder="ph_filter" placeholder="Filter…"></th>
+          <th><input class="col-filter" id="af-target" oninput="renderAttacks()" data-i18n-placeholder="ph_filter" placeholder="Filter…"></th>
+          <th><input class="col-filter" id="af-villageName" oninput="renderAttacks()" data-i18n-placeholder="ph_filter" placeholder="Filter…"></th>
+          <th><input class="col-filter" id="af-playerName" oninput="renderAttacks()" data-i18n-placeholder="ph_filter" placeholder="Filter…"></th>
+          <th><input class="col-filter" id="af-type" oninput="renderAttacks()" data-i18n-placeholder="ph_filter" placeholder="Filter…"></th>
+          <th colspan="9"></th>
+        </tr>
+      </thead>
+      <tbody id="attack-tbody">
+        <tr class="empty-row"><td colspan="14" data-i18n="empty_attacks">No attacks planned yet. Click "+ Add Attack" to begin.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════ TAB: MY VILLAGES ══════════════════ -->
+<div class="tab-content" id="tab-villages">
+  <div class="section-header">
+    <h2 data-i18n="tab_my_villages">My Villages</h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-file btn-sm" onclick="pasteVillages()" data-i18n="btn_paste_villages">📋 Paste Villages</button>
+      <button class="btn btn-danger btn-sm" onclick="clearVillages()" data-i18n="btn_clear_villages">🗑 Clear Villages</button>
+      <button class="btn btn-primary" onclick="togglePanel('add-village-panel')" data-i18n="btn_add_village">+ Add Village</button>
+    </div>
+  </div>
+
+  <div class="bookmarklet-panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <h4 data-i18n="bm_opt1_title">⚡ Option 1 — Script (automatic)</h4>
+        <div class="bookmarklet-row">
+          <a id="bm-link" class="btn btn-bookmarklet btn-sm" href="#" data-i18n="bm_drag" data-i18n-title="bm_drag_title" title="Drag this to your bookmarks bar">🔖 Drag to bookmarks bar</a>
+          <button class="btn btn-ghost btn-sm" onclick="copyBookmarklet()" data-i18n="btn_copy">Copy</button>
+        </div>
+        <p class="bookmarklet-note" data-i18n="bm_note">1. Drag the gold button to your bookmarks bar. 2. Open TW → Overview Villages → Recruit tab. 3. Click the bookmark — your troops are copied to clipboard. 4. Come back here and click "📋 Paste Villages".</p>
+      </div>
+      <div>
+        <h4 data-i18n="bm_opt2_title">📄 Option 2 — Save HTML manually</h4>
+        <div class="bookmarklet-row">
+          <button class="btn btn-file btn-sm" onclick="document.getElementById('html-import-input').click()" data-i18n="btn_select_html">📄 Select HTML File</button>
+          <input type="file" id="html-import-input" accept=".html,.htm" style="display:none" onchange="importFromRecruitHTML(event)">
+        </div>
+        <p class="bookmarklet-note" data-i18n="bm_opt2_note">1. Open TW → Recruit → Mass Recruit tab. 2. Press Ctrl+S → Save As → save the page as HTML Only. 3. Click "Select HTML File" and pick the saved file — villages are imported automatically.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-panel" id="add-village-panel">
+    <h3 data-i18n="sec_add_village">Add Village</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label data-i18n="lbl_x">X</label>
+        <input type="number" id="av-x" placeholder="500" oninput="dbAutoFillVillage()">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_y">Y</label>
+        <input type="number" id="av-y" placeholder="500" oninput="dbAutoFillVillage()">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_name">Name</label>
+        <input type="text" id="av-name" placeholder="My Village">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_village_id">Village ID</label>
+        <input type="number" id="av-vid" placeholder="12345">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_axes">Axes</label>
+        <input type="number" id="av-axes" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_lc">LC</label>
+        <input type="number" id="av-lc" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_rams">Rams</label>
+        <input type="number" id="av-rams" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_catapults">Catapults</label>
+        <input type="number" id="av-cats" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_nobles">Nobles</label>
+        <input type="number" id="av-nobles" value="0" min="0">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addVillage()" data-i18n="btn_add_village">Add Village</button>
+      <button class="btn btn-ghost" onclick="togglePanel('add-village-panel')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-i18n="lbl_name">Name</th>
+          <th data-i18n="lbl_id">ID</th>
+          <th data-i18n="lbl_coords">Coords</th>
+          <th data-i18n="lbl_axes">Axes</th>
+          <th data-i18n="lbl_lc">LC</th>
+          <th data-i18n="lbl_rams">Rams</th>
+          <th data-i18n="lbl_cats">Cats</th>
+          <th data-i18n="lbl_nobles">Nobles</th>
+          <th data-i18n="lbl_off_power">⚔ Off Power</th>
+          <th data-i18n="lbl_actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="villages-tbody">
+        <tr class="empty-row"><td colspan="11" data-i18n="empty_villages">No villages added yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════ TAB: TARGETS ══════════════════ -->
+<div class="tab-content" id="tab-targets">
+  <div class="section-header">
+    <h2 data-i18n="tab_targets">Targets</h2>
+    <div class="section-header-actions">
+      <button class="btn btn-ghost btn-sm" onclick="enrichTargets()" data-i18n="btn_enrich" data-i18n-title="btn_enrich_title" title="Fill missing data from Village DB">✦ Enrich from DB</button>
+      <button class="btn btn-ghost btn-sm" onclick="closePanel('import-off-panel');togglePanel('import-fake-panel')" data-i18n="btn_fake_targets">💨 Fake Targets</button>
+      <button class="btn btn-ghost btn-sm" onclick="closePanel('import-fake-panel');togglePanel('import-off-panel')" data-i18n="btn_off_targets">⚔ Off Targets</button>
+      <button class="btn btn-danger btn-sm" onclick="clearTargets()" data-i18n="btn_clear_targets">🗑 Clear Targets</button>
+      <button class="btn btn-primary" onclick="togglePanel('add-target-panel')" data-i18n="btn_add_target">+ Add Target</button>
+    </div>
+  </div>
+
+  <div class="form-panel" id="add-target-panel">
+    <h3 data-i18n="sec_add_target">Add Target</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label data-i18n="lbl_x">X</label>
+        <input type="number" id="at-x" placeholder="500" oninput="dbAutoFillTarget()">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_y">Y</label>
+        <input type="number" id="at-y" placeholder="500" oninput="dbAutoFillTarget()">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_name">Name</label>
+        <input type="text" id="at-name" placeholder="Village name">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_village_id">Village ID</label>
+        <input type="number" id="at-vid" placeholder="12345">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_player">Player</label>
+        <input type="text" id="at-player" placeholder="Player name">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_type">Type</label>
+        <select id="at-type" onchange="document.getElementById('at-reqs-row').style.display=this.value==='off'?'':'none'">
+          <option value="off" data-i18n="opt_target_off">Off</option>
+          <option value="fake" data-i18n="opt_target_fake">Fake</option>
+        </select>
+      </div>
+    </div>
+    <div id="at-reqs-row" style="margin-top:8px">
+      <label style="display:block;color:#a08050;font-size:13px;margin-bottom:4px" data-i18n="lbl_requirements">Requirements</label>
+      <p class="note" style="margin-bottom:6px">One per line: <code>off HH:MM-HH:MM</code> &nbsp;|&nbsp; <code>1/2 HH:MM-HH:MM</code> &nbsp;|&nbsp; <code>snob HH:MM-HH:MM</code> &nbsp;(time optional)</p>
+      <textarea id="at-reqs" rows="4" style="width:100%;background:#111008;border:1px solid #4a3010;color:#d4b483;padding:8px;border-radius:4px;font-family:monospace;font-size:12px;resize:vertical" placeholder="off 02:00-03:00&#10;snob 02:00-03:00&#10;1/2 02:00-03:00"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addTarget()" data-i18n="btn_add_target">Add Target</button>
+      <button class="btn btn-ghost" onclick="togglePanel('add-target-panel')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="form-panel" id="import-off-panel">
+    <h3 data-i18n="sec_import_off">⚔ Import Off Targets</h3>
+    <p class="note" style="margin-bottom:10px">Paste the BB-code off plan from your tribe forum.<br>
+      Lines starting with <code>[unit]ram[/unit]</code> = Complete off (or 3/4); <code>[unit]axe[/unit]</code> = 1/2 off; <code>[unit]snob[/unit]</code> = Noble attack.<br>
+      A time may be a window (<code>01:00/02:00</code>) or a single exact landing time (<code>01:00</code>).<br>
+      A <strong>per-player plan</strong> (blocks like <code>========== Player (n) ==========</code> with <code>src → [coord]tgt[/coord]</code> lines) is also accepted: each line becomes a target requirement attributed to the block's player. Set <strong>My Player</strong> to your name, then Auto-Generate to assign your villages.
+    </p>
+    <textarea id="import-off-text" rows="12" style="width:100%;background:#111008;border:1px solid #4a3010;color:#d4b483;padding:8px;border-radius:4px;font-family:monospace;font-size:12px;resize:vertical" data-i18n-placeholder="ph_off_paste" placeholder="Paste BB-code here...&#10;&#10;0. 557|555 - The Architect.&#10;[unit]ram[/unit] [player]Vanquished[/player] [b]02:00/03:00[/b]&#10;[unit]snob[/unit] [player]BigJoKeR13[/player] [b]02:00/03:00[/b]"></textarea>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="importOffTargets()" data-i18n="btn_import_off">Import Off Targets</button>
+      <button class="btn btn-ghost" onclick="closePanel('import-off-panel')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="form-panel" id="import-fake-panel">
+    <h3 data-i18n="sec_import_fake">💨 Import Fake Targets</h3>
+    <p class="note" style="margin-bottom:10px">Paste coordinates one per line (e.g. <code>557|555</code>). Each will be added as a fake target (1 spy / 1 ram).</p>
+    <textarea id="import-fake-text" rows="8" style="width:100%;background:#111008;border:1px solid #4a3010;color:#d4b483;padding:8px;border-radius:4px;font-family:monospace;font-size:12px;resize:vertical" placeholder="557|555&#10;566|567&#10;564|569"></textarea>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="importFakeTargets()" data-i18n="btn_import_fake">Import Fake Targets</button>
+      <button class="btn btn-ghost" onclick="closePanel('import-fake-panel')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-i18n="lbl_name">Name</th>
+          <th data-i18n="lbl_id">ID</th>
+          <th data-i18n="lbl_coords">Coords</th>
+          <th data-i18n="lbl_player">Player</th>
+          <th data-i18n="lbl_type">Type</th>
+          <th data-i18n="lbl_requirements">Requirements</th>
+          <th data-i18n="lbl_actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="targets-tbody">
+        <tr class="empty-row"><td colspan="7" data-i18n="empty_targets">No targets added yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════ TAB: SCAVENGING ══════════════════ -->
+<div class="tab-content" id="tab-scavenge">
+  <div class="section-header">
+    <h2 data-i18n="scav_title">🌾 Scavenging</h2>
+    <div class="section-header-actions">
+      <button class="btn btn-file btn-sm" onclick="pasteScavenge()" data-i18n="scav_btn_paste">📋 Paste Scavenge Data</button>
+      <button class="btn btn-file btn-sm" onclick="document.getElementById('scav-file-input').click()" data-i18n="scav_btn_file">📄 Select Saved Page</button>
+      <input type="file" id="scav-file-input" accept=".html,.htm,.mhtml,.mht" style="display:none" onchange="importScavengeFile(event)">
+      <button class="btn btn-danger btn-sm" onclick="clearScavenge()" data-i18n="scav_btn_clear">🗑 Clear</button>
+    </div>
+  </div>
+
+  <div class="bookmarklet-panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <h4 data-i18n="bm_opt1_title">⚡ Option 1 — Script (automatic)</h4>
+        <div class="bookmarklet-row">
+          <a id="bm-scav-link" class="btn btn-bookmarklet btn-sm" href="#" data-i18n="scav_bm_drag" data-i18n-title="bm_drag_title" title="Drag this to your bookmarks bar">🔖 Scavenging → Planner</a>
+          <button class="btn btn-ghost btn-sm" onclick="copyScavengeBookmarklet()" data-i18n="btn_copy">Copy</button>
+        </div>
+        <p class="bookmarklet-note" data-i18n="scav_bm_note">1. Drag the gold button to your bookmarks bar. 2. Open TW → Rally Point → Scavenging in the village you want to plan. 3. Click the bookmark — units at home and the state of the four options are copied to clipboard. 4. Come back here and click "📋 Paste Scavenge Data". Read-only: it only reads what the page already shows.</p>
+      </div>
+      <div>
+        <h4 data-i18n="bm_opt2_title">📄 Option 2 — Save HTML manually</h4>
+        <p class="bookmarklet-note" data-i18n="scav_bm_opt2_note">1. Open TW → Rally Point → Scavenging. 2. Press Ctrl+S → Save As → "Webpage, HTML Only" or "Webpage, Single File (.mhtml)". 3. Click "📄 Select Saved Page" and pick the file — the village is imported. No script runs on TW at all.</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="note" id="scav-empty" data-i18n="scav_empty">No scavenging data yet — run the bookmark on a village's Scavenging page and paste it here.</p>
+
+  <div id="scav-body" style="display:none">
+    <div class="scav-controls">
+      <div class="scav-control-group">
+        <label data-i18n="scav_lbl_village">Village</label>
+        <select id="scav-village-select" onchange="scavSelectVillage(this.value)"></select>
+        <button class="btn btn-ghost btn-sm" onclick="removeScavengeVillage()" data-i18n="scav_btn_remove" data-i18n-title="scav_btn_remove_title" title="Remove this village from the list">✕</button>
+        <span class="note" id="scav-village-meta"></span>
+      </div>
+      <div class="scav-control-group">
+        <label data-i18n="scav_lbl_mode">Optimize</label>
+        <label class="scav-radio"><input type="radio" name="scav-mode" id="scav-mode-hour" onchange="scavSetMode('hour')"> <span data-i18n="scav_mode_hour">Resources / hour</span></label>
+        <label class="scav-radio"><input type="radio" name="scav-mode" id="scav-mode-run" onchange="scavSetMode('run')"> <span data-i18n="scav_mode_run">Resources / run</span></label>
+      </div>
+      <div class="scav-control-group">
+        <label data-i18n="scav_lbl_max_hours">Max duration (h)</label>
+        <input type="number" id="scav-max-hours" min="0" step="0.5" placeholder="∞" oninput="scavSetMaxHours(this.value)" style="width:80px">
+        <span class="note" data-i18n="scav_max_hours_hint">0 / empty = no limit. Set it to how long you'll be away — every run must be back by then.</span>
+      </div>
+      <div class="scav-control-group">
+        <label data-i18n="scav_lbl_factor">Duration factor</label>
+        <input type="number" id="scav-factor" min="0.01" step="0.001" placeholder="auto" oninput="scavSetFactorOverride(this.value)" style="width:90px">
+        <span class="note" id="scav-factor-info"></span>
+        <span class="note" data-i18n="scav_factor_hint">NOT the world speed: a 2× world has a factor of ≈0.683 (speed^-0.55). Leave empty for auto.</span>
+      </div>
+    </div>
+
+    <div class="scav-units-head">
+      <h3 data-i18n="scav_units_title">Units to send</h3>
+      <div>
+        <button class="btn btn-ghost btn-sm" onclick="scavUseAll(true)" data-i18n="scav_btn_all">All</button>
+        <button class="btn btn-ghost btn-sm" onclick="scavUseAll(false)" data-i18n="scav_btn_none">None</button>
+      </div>
+    </div>
+    <div class="scav-units" id="scav-units"></div>
+
+    <div class="table-wrap">
+      <table class="scav-results">
+        <thead id="scav-results-thead"></thead>
+        <tbody id="scav-results-tbody"></tbody>
+      </table>
+    </div>
+    <div class="scav-summary" id="scav-summary"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ TAB: VILLAGE DB ══════════════════ -->
+<div class="tab-content" id="tab-db">
+  <div class="section-header">
+    <h2 data-i18n="tab_village_db">Village Database</h2>
+  </div>
+
+  <div class="db-controls">
+    <button class="btn btn-file" id="db-connect-btn" onclick="connectDbFolder()" data-i18n="btn_connect_db">⟁ Connect DB Folder</button>
+    <span id="db-status" data-i18n="db_not_connected">No folder connected</span>
+  </div>
+
+  <div class="db-controls">
+    <input type="text" id="db-search" data-i18n-placeholder="ph_db_search" placeholder="Search by name, ID, or player..." oninput="scheduleDbSearch()">
+    <span id="db-count" class="note"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-i18n="lbl_id">ID</th>
+          <th data-i18n="lbl_name">Name</th>
+          <th data-i18n="lbl_coords">Coords</th>
+          <th data-i18n="lbl_player">Player</th>
+          <th data-i18n="lbl_points">Points</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="db-tbody">
+        <tr class="empty-row"><td colspan="6" data-i18n="empty_db">Connect a DB folder to load village data.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════ TAB: GUIDE ══════════════════ -->
+<div class="tab-content" id="tab-guide">
+  <div class="faq-columns">
+
+    <!-- ── First Setup ── -->
+    <div class="faq-col">
+      <div class="lang-en-only">
+        <h2>🚀 First Setup</h2>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">1</span> Village Database</h3>
+          <p>Nothing to download or set up — the planner fetches the world's village and player data automatically every time you open it, so village names, IDs and player data are always up to date.</p>
+          <p>You can browse and search the loaded data in the <strong>Village DB</strong> tab.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">2</span> Configure world settings</h3>
+          <p>In the top bar, set <strong>World Speed</strong> and <strong>Unit Speed</strong> to match your server. For es103: World Speed <code>2×</code>, Unit Speed <code>0.5×</code>. Set <strong>My Player</strong> to your in-game name — this filters auto-generation to only your assigned requirements.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">3</span> Import your villages</h3>
+          <p><strong>Option 1 — Script (automatic):</strong> Drag the gold bookmarklet button to your browser's bookmarks bar. Open TW → Recruit → Mass Recruit tab, click the bookmark — your troops are copied to clipboard. Come back here and click <strong>📋 Paste Villages</strong>. This script only reads troop data already visible on the page — it does not interact with the game or send anything to the server.</p>
+          <p><strong>Option 2 — Save HTML manually:</strong> Open TW → Recruit → Mass Recruit tab, press <strong>Ctrl+S → Save As → HTML Only</strong>. Back here, click <strong>📄 Select HTML File</strong> and pick the saved file — villages are imported automatically. This is the safest option: no script runs on TW at all — you are simply feeding the saved HTML to the planner so it can read your units.</p>
+          <p>Use <strong>🗑 Clear Villages</strong> to remove all villages and start fresh.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">4</span> Add your villages (manual)</h3>
+          <p>In <strong>My Villages</strong>, click <strong>+ Add Village</strong> and fill in the coords, village ID, and troop counts (Axes, LC, Rams, Catapults, Nobles) manually.</p>
+        </div>
+      </div>
+      <div class="lang-es-only">
+        <h2>🚀 Configuración Inicial</h2>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">1</span> Base de Datos de Pueblos</h3>
+          <p>No hay nada que descargar ni configurar — el planificador carga automáticamente los datos de pueblos y jugadores del mundo cada vez que lo abres, así que los nombres de pueblos, IDs y datos de jugadores están siempre actualizados.</p>
+          <p>Puedes consultar y buscar en los datos cargados desde la pestaña <strong>Base de Datos</strong>.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">2</span> Configurar el mundo</h3>
+          <p>En la barra superior, ajusta <strong>Velocidad Mundo</strong> y <strong>Vel. Unidades</strong> según tu servidor. Para es103: Velocidad <code>2×</code>, Vel. Unidades <code>0.5×</code>. Escribe tu nombre en <strong>Mi Jugador</strong> — esto filtra la generación automática a solo tus requisitos asignados.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">3</span> Importar pueblos</h3>
+          <p><strong>Opción 1 — Script (automático):</strong> Arrastra el botón dorado a la barra de marcadores. Abre GT → Reclutar → Reclutamiento Masivo, haz clic en el marcador — las tropas se copian al portapapeles. Vuelve aquí y haz clic en <strong>📋 Pegar Pueblos</strong>. Este script solo lee los datos de tropas ya visibles en la página — no interactúa con el juego ni envía nada al servidor.</p>
+          <p><strong>Opción 2 — Guardar HTML manualmente:</strong> Abre GT → Reclutar → Reclutamiento Masivo, pulsa <strong>Ctrl+S → Guardar como → Sólo HTML</strong>. De vuelta aquí, haz clic en <strong>📄 Seleccionar archivo HTML</strong> y elige el archivo guardado — los pueblos se importan automáticamente. Esta es la opción más segura: no se ejecuta ningún script en GT — simplemente le estás dando al planificador el HTML guardado para que lea tus unidades.</p>
+          <p>Usa <strong>🗑 Borrar Pueblos</strong> para eliminar todos los pueblos y empezar de cero.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">4</span> Añadir pueblos (manual)</h3>
+          <p>En <strong>Mis Pueblos</strong>, haz clic en <strong>+ Añadir Pueblo</strong> e introduce las coordenadas, ID del pueblo y tropas (Hachas, Lijas, Arietes, Catapultas, Nobles) manualmente.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Planning an Op ── -->
+    <div class="faq-col">
+      <div class="lang-en-only">
+        <h2>⚔ Planning an Op</h2>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">1</span> Import targets</h3>
+          <p>Go to <strong>Targets</strong> → click <strong>⚔ Off Targets</strong> and paste the BB-code op plan from your tribe forum. Lines with <code>[unit]ram[/unit]</code> = complete off, <code>[unit]axe[/unit]</code> = 1/2 off, <code>[unit]snob[/unit]</code> = noble train.</p>
+          <p>The easiest way: open the message or forum post where you received the op instructions, click <strong>Quote</strong>, and paste the whole quoted text. Everything — off sizes, times, coords, targets, players — is auto-imported.</p>
+          <p>For fake-only targets, use <strong>💨 Fake Targets</strong> and paste one coordinate per line (e.g. <code>557|555</code>). You can also add a target manually with <strong>+ Add Target</strong> — set the type (Off / Fake) and requirements directly.</p>
+          <p>Use <strong>🗑 Clear Targets</strong> to remove all targets and start a new op.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">2</span> Auto-generate attacks</h3>
+          <p>Go to <strong>Attack Plan</strong> → click <strong>⚡ Auto-Generate</strong>. Pick a landing date, configure criteria (Power, Distance, Send Window) and options, then click <strong>Generate</strong>.</p>
+          <p>Attacks appear in the table sorted by send time. Any unassigned requirements (ran out of nobles or off villages) appear as red rows — review them and assign manually if needed.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">3</span> Send your attacks</h3>
+          <p>Click <strong>⚔ Enviar</strong> on each row to open the TW rally point pre-filled with the correct troops and target. After sending, click <strong>✓ Sent</strong> to mark it — the row moves to the bottom and greys out. If a village can no longer make it, click <strong>♻</strong> on its row to pick a replacement sender: every village that could still land inside the window is listed, and the free ones (not sending anything else in the plan) are marked <strong>🏠</strong>.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">4</span> Add attacks manually</h3>
+          <p>Click <strong>+ Add Attack</strong> in the Attack Plan section header to add an individual attack. Select the source village, target, type (Off / Fake / Snob) and landing time.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">5</span> Save &amp; backup</h3>
+          <p>Data auto-saves to browser storage. Connect a local file via <strong>⟁ Connect File</strong> for persistent storage. Use <strong>↓ Export</strong> / <strong>↑ Import</strong> in the top bar for manual backups.</p>
+          <p>Use <strong>📋 Export BB Code</strong> to copy the full attack plan as a BB-code table you can post directly in your tribe forum.</p>
+        </div>
+      </div>
+      <div class="lang-es-only">
+        <h2>⚔ Planificar una Op</h2>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">1</span> Importar objetivos</h3>
+          <p>Ve a <strong>Objetivos</strong> → haz clic en <strong>⚔ Obj. Off</strong> y pega el plan BB-code del foro de tu tribu. Líneas con <code>[unit]ram[/unit]</code> = off completo, <code>[unit]axe[/unit]</code> = 1/2 off, <code>[unit]snob[/unit]</code> = tren de nobles.</p>
+          <p>La forma más fácil: abre el mensaje o post del foro donde recibiste las instrucciones de la op, haz clic en <strong>Citar</strong>, y pega todo el texto citado. Tallas de off, horarios, coordenadas, objetivos y jugadores se importan automáticamente.</p>
+          <p>Para objetivos solo de fake, usa <strong>💨 Obj. Fake</strong> y pega una coordenada por línea (ej. <code>557|555</code>). También puedes añadir un objetivo manualmente con <strong>+ Añadir Objetivo</strong> — establece el tipo (Off / Fake) y los requisitos directamente.</p>
+          <p>Usa <strong>🗑 Borrar Objetivos</strong> para eliminar todos los objetivos y empezar una nueva op.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">2</span> Auto-generar ataques</h3>
+          <p>Ve a <strong>Plan de Ataque</strong> → haz clic en <strong>⚡ Auto-Generar</strong>. Elige una fecha de llegada, configura los criterios (Poder, Distancia, Ventana de Envío) y opciones, y haz clic en <strong>Generar</strong>.</p>
+          <p>Los ataques aparecen en la tabla ordenados por hora de envío. Los requisitos sin asignar (sin nobles ni pueblos off disponibles) aparecen como filas rojas — revísalos y asígnalos manualmente si es necesario.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">3</span> Enviar los ataques</h3>
+          <p>Haz clic en <strong>⚔ Enviar</strong> en cada fila para abrir la plaza de reuniones pre-rellenada con las tropas y el objetivo correctos. Tras enviar, haz clic en <strong>✓ Enviado</strong> — la fila baja al fondo y se oscurece. Si un pueblo ya no llega a tiempo, haz clic en <strong>♻</strong> en su fila para elegir otro origen: se listan todos los pueblos que aún llegarían dentro de la ventana, y los libres (que no envían nada más en el plan) llevan <strong>🏠</strong>.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">4</span> Añadir ataques manualmente</h3>
+          <p>Haz clic en <strong>+ Añadir Ataque</strong> en la cabecera del Plan de Ataque para añadir un ataque individual. Selecciona el pueblo de origen, objetivo, tipo (Off / Fake / Noble) y hora de llegada.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">5</span> Guardar y hacer copia de seguridad</h3>
+          <p>Los datos se guardan automáticamente en el navegador. Conecta un archivo local con <strong>⟁ Conectar Archivo</strong> para almacenamiento persistente. Usa <strong>↓ Exportar</strong> / <strong>↑ Importar</strong> en la barra superior para copias manuales.</p>
+          <p>Usa <strong>📋 Exportar BB Code</strong> para copiar el plan de ataque completo como tabla BB-code y pegarlo directamente en el foro de tu tribu.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── Scavenging ── -->
+    <div class="faq-col">
+      <div class="lang-en-only">
+        <h2>🌾 Scavenging</h2>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">1</span> Import a village</h3>
+          <p>Drag the gold <strong>🔖 Scavenging → Planner</strong> button to your bookmarks bar. In TW open <strong>Rally Point → Scavenging</strong> for the village, click the bookmark, then click <strong>📋 Paste Scavenge Data</strong> here. Or save the page (Ctrl+S, HTML Only or Single File .mhtml) and use <strong>📄 Select Saved Page</strong>. Repeat per village — each one is kept in the village dropdown.</p>
+          <p>The import reads the units at home, which of the four options are free / running / locked, and the world's scavenging speed (from the page's duration preview). Nothing is sent to the game.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">2</span> Choose what to send</h3>
+          <p>Untick a unit type to keep all of it at home, or type a number in <strong>Keep</strong> to hold back a reserve. The plan recalculates instantly. Only the <strong>carry capacity</strong> matters for scavenging — no troops are ever lost — so send whatever is idle.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">3</span> Pick the goal</h3>
+          <p><strong>Resources / hour</strong> spreads troops across every free option so the combined income is highest — use it when you re-send as soon as runs return. <strong>Resources / run</strong> maximises one trip: everything goes to the best option, spilling down only when a <strong>Max duration</strong> is set — use it with the hours you'll be away (e.g. <code>8</code> overnight) so all runs are back when you are.</p>
+          <p>Why split at all? The same troops take the <em>same</em> time on any option (the higher one just pays more), but duration grows slower than capacity, so four smaller concurrent runs out-earn one big one — often by 50–90 %. The summary line shows the gain versus putting everything in the top option.</p>
+        </div>
+      </div>
+      <div class="lang-es-only">
+        <h2>🌾 Recolección</h2>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">1</span> Importar un pueblo</h3>
+          <p>Arrastra el botón dorado <strong>🔖 Recolección → Planificador</strong> a la barra de marcadores. En GT abre <strong>Plaza de reuniones → Recolección</strong> del pueblo, haz clic en el marcador y luego en <strong>📋 Pegar Recolección</strong> aquí. O guarda la página (Ctrl+S, Sólo HTML o Archivo único .mhtml) y usa <strong>📄 Seleccionar página guardada</strong>. Repite por pueblo — cada uno queda en el desplegable.</p>
+          <p>La importación lee las unidades en el pueblo, qué opciones están libres / en curso / bloqueadas y la velocidad de recolección del mundo (de la duración previa de la página). No se envía nada al juego.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">2</span> Elegir qué enviar</h3>
+          <p>Desmarca un tipo de unidad para dejarlo entero en casa, o escribe un número en <strong>Guardar</strong> para reservar parte. El plan se recalcula al instante. En recolección solo cuenta la <strong>capacidad de carga</strong> — nunca se pierden tropas — así que manda lo que esté parado.</p>
+        </div>
+        <div class="faq-step">
+          <h3><span class="faq-step-num">3</span> Elegir el objetivo</h3>
+          <p><strong>Recursos / hora</strong> reparte las tropas entre todas las opciones libres para que la suma de ingresos sea máxima — úsalo si reenvías en cuanto vuelven. <strong>Recursos / viaje</strong> maximiza un solo envío: todo a la mejor opción, bajando a las demás solo si fijas una <strong>Duración máx.</strong> — úsalo con las horas que vas a estar fuera (p. ej. <code>8</code> por la noche) para que todo haya vuelto cuando regreses.</p>
+          <p>¿Por qué repartir? Las mismas tropas tardan <em>lo mismo</em> en cualquier opción (la superior solo paga más), pero la duración crece más despacio que la capacidad, así que cuatro envíos pequeños simultáneos rinden más que uno grande — a menudo un 50–90 % más. La línea de resumen muestra la ganancia frente a meterlo todo en la opción superior.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL: EDIT VILLAGE ══════════════════ -->
+<div class="modal-backdrop" id="modal-village">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-village')" data-i18n-title="btn_close" title="Close" aria-label="Close">✕</button>
+    <h3 data-i18n="modal_edit_village">Edit Village</h3>
+    <input type="hidden" id="mv-id">
+    <div class="form-grid">
+      <div class="form-group">
+        <label data-i18n="lbl_name">Name</label>
+        <input type="text" id="mv-name">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_village_id">Village ID</label>
+        <input type="number" id="mv-vid">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_x">X</label>
+        <input type="number" id="mv-x">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_y">Y</label>
+        <input type="number" id="mv-y">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_axes">Axes</label>
+        <input type="number" id="mv-axes" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_lc">LC</label>
+        <input type="number" id="mv-lc" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_rams">Rams</label>
+        <input type="number" id="mv-rams" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_catapults">Catapults</label>
+        <input type="number" id="mv-cats" min="0">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_nobles">Nobles</label>
+        <input type="number" id="mv-nobles" min="0">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveVillage()" data-i18n="btn_save">Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-village')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL: EDIT TARGET ══════════════════ -->
+<div class="modal-backdrop" id="modal-target">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-target')" data-i18n-title="btn_close" title="Close" aria-label="Close">✕</button>
+    <h3 data-i18n="modal_edit_target">Edit Target</h3>
+    <input type="hidden" id="mt-id">
+    <div class="form-grid">
+      <div class="form-group">
+        <label data-i18n="lbl_x">X</label>
+        <input type="number" id="mt-x" oninput="dbAutoFillModal()">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_y">Y</label>
+        <input type="number" id="mt-y" oninput="dbAutoFillModal()">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_name">Name</label>
+        <input type="text" id="mt-name">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_village_id">Village ID</label>
+        <input type="number" id="mt-vid">
+      </div>
+      <div class="form-group" style="grid-column: span 2">
+        <label data-i18n="lbl_player">Player</label>
+        <input type="text" id="mt-player">
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <label style="display:block;color:#a08050;font-size:13px;margin-bottom:4px" data-i18n="lbl_requirements">Requirements</label>
+      <div id="mt-reqs-list"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="mtReqAdd()" data-i18n="btn_add_req">+ Add requirement</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="mtReqAssignAll()" data-i18n="btn_assign_me">👤 Assign all to me</button>
+      </div>
+      <p class="note" style="margin-top:6px" data-i18n="mt_reqs_hint">One row per attack. The player must match “My Player” to be picked up by Auto-Generate. Source is the origin coord X|Y that pins the sender (optional).</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveTarget()" data-i18n="btn_save">Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-target')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL: AUTO-GENERATE ══════════════════ -->
+<div class="modal-backdrop" id="modal-autogen">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-autogen')" data-i18n-title="btn_close" title="Close" aria-label="Close">✕</button>
+    <h3 data-i18n="modal_autogen">⚡ Auto-Generate Attacks</h3>
+    <div class="form-grid">
+      <div class="form-group" style="grid-column:span 2">
+        <label data-i18n="lbl_landing_date">Landing Date</label>
+        <input type="date" id="ag-date">
+      </div>
+      <div class="form-group" style="grid-column:span 2">
+        <label><span data-i18n="ag_criteria_label">Off Assignment Criteria</span> <small style="color:#806838;font-weight:normal" data-i18n="ag_criteria_hint">(priority order: Power → Distance → Window)</small></label>
+        <div style="display:flex;flex-direction:column;gap:7px;margin-top:5px">
+          <label style="font-weight:normal;cursor:pointer;color:#d4b483">
+            <input type="checkbox" id="ag-crit-power" checked onchange="updateAutoGenPreview()">
+            &nbsp;<span data-i18n="ag_crit_power">Power — strongest for complete offs, weakest qualifying for 1/2 offs</span>
+          </label>
+          <label style="font-weight:normal;cursor:pointer;color:#d4b483">
+            <input type="checkbox" id="ag-crit-distance" checked onchange="updateAutoGenPreview()">
+            &nbsp;<span data-i18n="ag_crit_distance">Distance — prefer closest available village</span>
+          </label>
+          <label style="font-weight:normal;cursor:pointer;color:#d4b483">
+            <input type="checkbox" id="ag-crit-window" onchange="updateAutoGenPreview()">
+            &nbsp;<span data-i18n="ag_crit_window">Send window — prefer send times closest to the target arrival window</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-group" style="grid-column:span 2">
+        <label data-i18n="lbl_options">Options</label>
+        <label style="font-weight:normal;cursor:pointer;color:#d4b483;margin-top:5px">
+          <input type="checkbox" id="ag-include-fakes" onchange="updateAutoGenPreview()">
+          &nbsp;<span data-i18n="ag_include_fakes">Include fakes</span>
+        </label>
+        <div style="margin-top:5px">
+          <label style="font-weight:normal;cursor:pointer;color:#d4b483">
+            <input type="checkbox" id="ag-divided-off-all" onchange="toggleAllDividedOff(this.checked)">
+            &nbsp;<span data-i18n-html="ag_divided_off_label"><strong>Divided Off</strong> — for selected villages: split troops evenly with nobles, exclude from separate off plan</span>
+          </label>
+          <div id="ag-divided-off-villages" style="margin-top:6px;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#5a3a18">
+            <!-- populated on open -->
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note" data-i18n-html="ag_note" style="margin-top:10px;line-height:1.6">
+      Landing times are taken from each target's requirements (e.g. 02:00).<br>
+      • <strong>Off villages</strong> (≥1/2 power): 1 real off per assigned target.<br>
+      • <strong>Fakes</strong> (when enabled): up to 10 per village with rams, to fake &amp; off targets.<br>
+      • <strong>Snobs</strong>: trains of 4 from the village with most nobles.
+    </p>
+    <div id="ag-preview" style="margin-top:12px;padding:10px;background:#160f04;border-radius:4px;font-size:12px;color:#a08850;min-height:40px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="runAutoGenerate()" data-i18n="btn_generate">Generate</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-autogen')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL: EXPORT ══════════════════ -->
+<div class="modal-backdrop" id="modal-export">
+  <div class="modal" style="max-width:860px">
+    <button class="modal-close" onclick="closeModal('modal-export')" data-i18n-title="btn_close" title="Close" aria-label="Close">✕</button>
+    <h3 data-i18n="modal_export">📋 Export to Notepad</h3>
+    <textarea id="export-text" readonly style="width:100%;height:320px;background:#111008;border:1px solid #4a3010;color:#d4b483;padding:8px;border-radius:4px;font-family:monospace;font-size:11px;resize:vertical"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="copyExportText()" data-i18n="btn_copy_all">Copy All</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-export')" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL: EDIT ATTACK ══════════════════ -->
+<div class="modal-backdrop" id="modal-attack">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-attack')" data-i18n-title="btn_close" title="Close" aria-label="Close">✕</button>
+    <h3 data-i18n="modal_edit_attack">Edit Attack</h3>
+    <input type="hidden" id="ma-id">
+    <div class="form-grid wide">
+      <div class="form-group">
+        <label data-i18n="lbl_from_village">From Village</label>
+        <select id="ma-from"></select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_target">Target</label>
+        <select id="ma-target"></select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_type">Type</label>
+        <select id="ma-type" onchange="onAttackTypeChange('ma-noble-row')">
+          <option value="off" data-i18n="opt_off">Off (Rams)</option>
+          <option value="fake" data-i18n="opt_fake">Fake (1 spy/1 ram)</option>
+          <option value="snob" data-i18n="opt_snob">Snob (Nobleman)</option>
+        </select>
+      </div>
+      <div class="form-group hidden" id="ma-noble-row">
+        <label data-i18n="lbl_noble_count">Noble Count</label>
+        <input type="number" id="ma-nobles" value="1" min="1" max="4">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_speed">Speed (timing)</label>
+        <select id="ma-speed">
+          <option value="" data-i18n="opt_speed_auto">Auto (by type)</option>
+          <option value="axe" data-i18n="opt_speed_axe">Axe (18)</option>
+          <option value="sword" data-i18n="opt_speed_sword">Sword (22)</option>
+          <option value="lc" data-i18n="opt_speed_lc">Light Cavalry (10)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_landing_time">Landing Time</label>
+        <input type="datetime-local" id="ma-landing" step="1">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveAttack()" data-i18n="btn_save">Save</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-attack')" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL: REPLACE SENDER ══════════════════ -->
+<div class="modal-backdrop" id="modal-replace">
+  <div class="modal" style="max-width:980px">
+    <button class="modal-close" onclick="closeModal('modal-replace')" data-i18n-title="btn_close" title="Close" aria-label="Close">✕</button>
+    <h3 data-i18n="modal_replace">♻ Replace Sender</h3>
+    <input type="hidden" id="mr-id">
+    <p id="mr-head" style="font-size:13px;color:#d4b483;margin-bottom:8px;line-height:1.7"></p>
+    <p class="note" style="margin-bottom:10px" data-i18n="rp_hint">🏠 = free village: not the sender of any other off / noble attack in this plan and not pinned as a sender by the Offensive Plan. Only villages whose send window is still open — right now or later — are listed; for an off, only villages with at least 300,000 off power.</p>
+    <div class="table-wrap">
+      <table id="replace-table">
+        <thead>
+          <tr>
+            <th data-i18n="lbl_village">Village</th>
+            <th data-i18n="rp_status">Status</th>
+            <th data-i18n="lbl_off_power">Off Power</th>
+            <th data-i18n="lbl_dist">Dist</th>
+            <th data-i18n="lbl_travel">Travel</th>
+            <th data-i18n="lbl_send_at">Send At</th>
+            <th data-i18n="lbl_countdown">Countdown</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="mr-tbody"></tbody>
+      </table>
+    </div>
+    <p class="note" id="mr-note" style="margin-top:8px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-replace')" data-i18n="btn_close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/attack-planner/i18n.js"></script>
+<script src="js/attack-planner/core.js"></script>
+<script src="js/attack-planner/storage.js"></script>
+<script src="js/attack-planner/cloud-sync.js"></script>
+<script src="js/attack-planner/ui.js"></script>
+<script src="js/attack-planner/import.js"></script>
+<script src="js/attack-planner/plan.js"></script>
+<script src="js/attack-planner/attacks.js"></script>
+<script src="js/attack-planner/scavenge.js"></script>
+<script src="js/attack-planner/init.js"></script>
+<div class="footer">
+  Developed by <span>Vanquished</span> &nbsp;·&nbsp; v1.10.1 &nbsp;·&nbsp; 2026-09-12
+</div>
+</body>
+</html>
