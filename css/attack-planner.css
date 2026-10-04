@@ -210,6 +210,7 @@
     .badge-off      { background: #380c0c; color: #e06060; }
     .badge-snob     { background: #2a2a10; color: #d0c040; }
     .badge-fake     { background: #0c1838; color: #6090e0; }
+    .badge-catapult { background: #2a1040; color: #c080f0; }
     .badge-complete { background: #1a3a10; color: #60d840; }
     .badge-tq       { background: #2a2a10; color: #d0c040; }
     .badge-half     { background: #2a1a08; color: #d08040; }
@@ -221,6 +222,7 @@
     .req-axe   { background:#1a1208; color:#a09050; }
     .req-snob  { background:#0c1838; color:#6090e0; }
     .req-fake  { background:#0a1828; color:#5080c0; }
+    .req-catapult { background:#1e0c30; color:#b070e0; }
 
     /* ── Countdown cells ── */
     .cd-ok     { color: #50d870; font-weight: 600; font-family: monospace; }

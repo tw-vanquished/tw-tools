@@ -97,7 +97,7 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
 
   const vs = {};
   DATA.villages.forEach(v => {
-    vs[v.id] = { noblesLeft: v.nobles || 0, usedForOff: false, fakeCount: 0 };
+    vs[v.id] = { noblesLeft: v.nobles || 0, catsLeft: v.cats || 0, usedForOff: false, fakeCount: 0 };
   });
 
   const attacks = [];
@@ -117,7 +117,7 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
     if (!v) {
       v = { id: uid(), name: `(${sx}|${sy})`, villageId: vid || '', x: sx, y: sy, axes: 0, lc: 0, rams: 0, cats: 0, nobles: 0 };
       DATA.villages.push(v);
-      vs[v.id] = { noblesLeft: v.nobles || 0, usedForOff: false, fakeCount: 0 };
+      vs[v.id] = { noblesLeft: v.nobles || 0, catsLeft: v.cats || 0, usedForOff: false, fakeCount: 0 };
     }
     return v;
   }
@@ -142,6 +142,13 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
         vs[v.id].fakeCount++;
         pinnedFakeTargets.add(target.id);
         attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'fake', nobleCount: 1, landingTime: iso, windowFrom: req.timeFrom, windowTo: req.timeTo, sent: false });
+      } else if (req.unitType === 'catapult') {
+        // Catapult attack pinned by the per-player export: catCount = the planned catapult
+        // number (0 = unknown → the rally link presets every catapult the village owns);
+        // building = the demolition objective. Catapults spent here are off the unpinned pool.
+        const cc = req.count > 1 ? req.count : 0;
+        vs[v.id].catsLeft = Math.max(0, vs[v.id].catsLeft - (cc || vs[v.id].catsLeft));
+        attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'catapult', nobleCount: 1, catCount: cc, landingTime: iso, windowFrom: req.timeFrom, windowTo: req.timeTo, building: req.building, sent: false });
       } else {
         // building = the Catapult Mode "(→ Building)" objective imported with the requirement
         // (undefined otherwise — JSON drops it), shown as the attack row's Building column.
@@ -197,6 +204,28 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
     .filter(need => !assignedNeeds.has(need))
     .map(need => ({ targetId: need.target.id, unitType: need.unitType, iso: need.iso, windowFrom: need.windowFrom, windowTo: need.windowTo, building: need.building }));
 
+  // ── Catapult attacks (unpinned: forum export names the sender but not the village) ──
+  // Runs AFTER the off assignment so a village already sending an off (whose rally link
+  // presets all its catapults) is only a last resort. Prefer villages that stay out of the
+  // off/snob passes and still hold enough catapults; closest first when the distance
+  // criterion is on, else the one with the most catapults. Nothing fits → unassigned row.
+  const missedCats = [];
+  offTargets.forEach(target => {
+    myReqs(target).filter(r => r.unitType === 'catapult' && !r.srcCoord).forEach(req => {
+      const iso = landingISO(req.timeFrom || defaultTime, req.dateISO);
+      const cc  = req.count > 1 ? req.count : 0;
+      const byPref = criteria.distance
+        ? (a, b) => dist(a, target) - dist(b, target)
+        : (a, b) => vs[b.id].catsLeft - vs[a.id].catsLeft;
+      const avail = DATA.villages.filter(v => vs[v.id].catsLeft >= Math.max(1, cc));
+      const v = avail.filter(v => !vs[v.id].usedForOff && !vs[v.id].usedForSnob).sort(byPref)[0]
+             || avail.sort(byPref)[0];
+      if (!v) { missedCats.push({ targetId: target.id, unitType: 'catapult', iso, windowFrom: req.timeFrom, windowTo: req.timeTo, building: req.building }); return; }
+      vs[v.id].catsLeft = Math.max(0, vs[v.id].catsLeft - (cc || vs[v.id].catsLeft));
+      attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'catapult', nobleCount: 1, catCount: cc, landingTime: iso, windowFrom: req.timeFrom, windowTo: req.timeTo, building: req.building, sent: false });
+    });
+  });
+
   // ── Fakes (bulk spray) ──
   // Adds up-to-one extra fake per target across every off + fake target, round-robin over
   // villages with rams (≤10 each). Targets already handled by an explicit pinned fake above
@@ -224,7 +253,7 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
     }
   }
 
-  return { attacks, missedSnobs, missedOffs };
+  return { attacks, missedSnobs, missedOffs, missedCats };
 }
 
 // Combined composite assignment — lexicographic priority: Power (×10000) → Distance (×100) → Window (×1)
@@ -415,10 +444,11 @@ function runAutoGenerate() {
     [...document.querySelectorAll('.ag-dov-cb:checked')].map(cb => cb.dataset.vid)
   );
 
-  const { attacks, missedSnobs, missedOffs } = autoGenerateAttacks(dateStr, criteria, includeFakes, dividedOffVillages);
+  const { attacks, missedSnobs, missedOffs, missedCats } = autoGenerateAttacks(dateStr, criteria, includeFakes, dividedOffVillages);
   const unassigned = [
     ...missedSnobs.map(m => ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, sent: false })),
     ...missedOffs.map(m =>  ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, building: m.building, sent: false })),
+    ...missedCats.map(m =>  ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, building: m.building, sent: false })),
   ];
 
   if (!attacks.length && !unassigned.length) {
@@ -440,11 +470,13 @@ function runAutoGenerate() {
   const offs  = attacks.filter(a => a.type === 'off').length;
   const snobs = attacks.filter(a => a.type === 'snob').length;
   const fakes = attacks.filter(a => a.type === 'fake').length;
+  const cats  = attacks.filter(a => a.type === 'catapult').length;
   let msg = t('alert_generated')
     .replace('{total}', attacks.length)
     .replace('{offs}', offs)
     .replace('{snobs}', snobs)
     .replace('{fakes}', fakes);
+  if (cats) msg += t('alert_generated_cats').replace('{n}', cats);
   if (unassigned.length) {
     msg += t('alert_generated_unassigned').replace('{n}', unassigned.length);
   }

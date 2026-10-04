@@ -19,6 +19,17 @@ function buildingLabelOf(line) {
   return m ? m[1].trim() : '';
 }
 
+// Catapult count of a tribe-calculator catapult-attack row: the bold "(N)" / "(N → Building)"
+// parenthetical after the icon (per-player export, FORMAT CONTRACT plan.js playerPlanBBBlock),
+// falling back to the rally URL's "&catapult=N" preset. 0 = unknown (the forum export carries
+// no count) — Auto-Generate then sends every catapult the source village owns.
+function catCountOf(line) {
+  const pm = line.match(/\((\d+)\s*(?:→[^)]*)?\)/);
+  if (pm) return parseInt(pm[1], 10);
+  const um = line.match(/[?&]catapult=(\d+)/);
+  return um ? parseInt(um[1], 10) : 0;
+}
+
 function parseOffPlanBB(text) {
   const targets = [];
   // A target listed under several ARRIVAL DATE sections — a tribe-calculator plan with multiple
@@ -44,13 +55,15 @@ function parseOffPlanBB(text) {
     // Attack line: [unit]TYPE[/unit] [player]NAME[/player] [b]HH:MM/HH:MM[/b]
     // The trailing time may be a window (HH:MM/HH:MM) or a single exact time (HH:MM).
     const am = line.match(/\[unit\](\w+)\[\/unit\].*?\[player\](.+?)\[\/player\].*?(\d{1,2}:\d{2})(?:\s*[\/\-–]\s*(\d{1,2}:\d{2}))?/);
-    // Catapult demolition rows (tribe-calculator) aren't clearing-off / noble requirements —
-    // they belong to a separate workflow, so the attack planner skips them on import.
-    if (am && am[1].toLowerCase() !== 'catapult') {
+    if (am) {
       // FAKE rows lead with the spy icon ([unit]spy[/unit][unit]ram[/unit] in the forum export);
       // record them as a 'fake' requirement so importOffTargets can mark an all-fake target.
-      const unitType = am[1].toLowerCase() === 'spy' ? 'fake' : am[1];
+      // Catapult-attack rows ([unit]catapult[/unit], tribe-calculator ≥ v3.16) import as a
+      // 'catapult' requirement (v1.11.0) — the forum export names no count, so the sender
+      // fires every catapult its village owns; "(→ Building)" is the demolition objective.
+      const unitType = am[1].toLowerCase() === 'spy' ? 'fake' : am[1].toLowerCase();
       const req = { unitType, attacker: am[2].trim(), timeFrom: am[3], timeTo: am[4] || '' };
+      if (unitType === 'catapult') { const n = catCountOf(line); if (n) req.count = n; }
       // Catapult Mode: the off row's "(→ Building)" objective for its riding catapults.
       const building = buildingLabelOf(line);
       if (building) req.building = building;
@@ -93,6 +106,9 @@ function parseOffPlanBB(text) {
 //           attack's requirement individually (requirement.arrivalDay → dateISO on import).
 //   fake    [unit]spy[/unit][unit]ram[/unit] [b](FAKE)[/b] 547|552 → [coord]583|524[/coord] …  (parses like an
 //           off but classified 'fake' — the spy icon is its only reliable structural marker)
+//   cat     [unit]catapult[/unit] [b](25 → Granja)[/b] 547|552 → [coord]583|524[/coord] …  (a catapult
+//           attack from a defensive village: classified 'catapult', count = the "(N …)" paren
+//           or the rally URL's &catapult=N, building = the demolition objective — v1.11.0)
 //   launch  …LAUNCH TIME:… — [url=…]ATTACK URL▶[/url][/b]      (continuation line: rally URL
 //           carrying the village=/target= IDs; old single-line exports put it on the off line)
 //   snob    4x [unit]snob[/unit] ⚠ Prepare Snob Train for [coord]572|521[/coord] ⚠ ([player]Def[/player]) [b]…02:00-03:00…
@@ -100,9 +116,8 @@ function parseOffPlanBB(text) {
 //
 // Ignored on purpose: the "Objective N." context dump (its off rows have no "→ [coord]" and its
 // snob rows carry no [coord] at all), "Villages in snob range" lines (bare coords), the
-// UNASSIGNED block (bare "label → coord", no [coord] tag), Per-Player Table [table] rows (no
-// "→", no [unit]snob[/unit]), and [unit]catapult[/unit] rows — catapult demolition belongs to a
-// separate workflow and must not import as a phantom off requirement.
+// UNASSIGNED block (bare "label → coord", no [coord] tag), and Per-Player Table [table] rows
+// (no "→", no [unit]snob[/unit]).
 
 // Arrival window = the FIRST "HH:MM" or "HH:MM-HH:MM" after the target's [/coord] on the
 // attack/snob line itself, with every BB tag stripped first — so color hexes, [b] nesting, or
@@ -193,11 +208,6 @@ function parsePlayerPlanBB(text) {
   for (const rec of records) {
     const line = rec.text, sender = rec.sender;
 
-    // Catapult demolition rows (tribe-calculator) carry "→ [coord]" + a rally URL like an off,
-    // but they're not clearing-off / noble requirements — skip them so they don't import as
-    // phantom axe offs (the unit-classify below has no catapult tier and would fall to 'axe').
-    if (/\[unit\]catapult\[\/unit\]/i.test(line)) continue;
-
     let tx, ty, srcCoord = '', unitType;
     if (rec.kind === 'snob') {
       const tm = line.match(coordRe);
@@ -209,19 +219,24 @@ function parsePlayerPlanBB(text) {
       const sm = line.match(/(\d{1,3}\|\d{1,3})\s*→\s*\[coord\]/);   // pinned source coord — must
       srcCoord = sm ? sm[1] : '';                                    // precede "[coord]" so a
                                                                      // "(→ Building)" label can't match
-      // Unit: FAKE first — tribe-calculator's fake rows ride a lone ram behind a spy icon
+      // Unit: CATAPULT first — a catapult-attack row ([unit]catapult[/unit], from a defensive
+      // village) has its own tier (v1.11.0; the unit-classify below would otherwise fall to
+      // 'axe'). Then FAKE — tribe-calculator's fake rows ride a lone ram behind a spy icon
       // ([unit]spy[/unit][unit]ram[/unit]), so the spy tag (which no other row type uses) must
       // be tested BEFORE ram or a fake would mis-type as a real ram off. Then snob (incl.
       // old-format escorted "[unit]axe[/unit][unit]snob[/unit]" attack lines), else ram, else
       // axe. Ram vs axe stay distinct — different power tiers.
-      unitType = /\[unit\]spy\[\/unit\]/i.test(line)  ? 'fake'
+      unitType = /\[unit\]catapult\[\/unit\]/i.test(line) ? 'catapult'
+               : /\[unit\]spy\[\/unit\]/i.test(line)  ? 'fake'
                : /\[unit\]snob\[\/unit\]/i.test(line) ? 'snob'
                : /\[unit\]ram\[\/unit\]/i.test(line)  ? 'ram'
                : 'axe';
     }
 
-    const cm    = line.match(/^(\d+)\s*x\s+/i);            // "4x " train size
-    const count = cm ? parseInt(cm[1], 10) : 1;
+    // "4x " train size for snob lines; for a catapult attack the count is its catapult number
+    // ("(25 → Granja)" / &catapult=25) — 1 when unknown (normalizeReqs keeps 1 as "unset").
+    const cm    = line.match(/^(\d+)\s*x\s+/i);
+    const count = unitType === 'catapult' ? (catCountOf(line) || 1) : (cm ? parseInt(cm[1], 10) : 1);
 
     const pm = line.match(/\(\[player\](.+?)\[\/player\]\)/);          // target owner (defender)
     const defender = pm ? pm[1].trim() : '';
@@ -289,6 +304,8 @@ function arrivalDayToISO(day, now = new Date()) {
 // A target's type from its imported requirements: 'fake' only when it has requirements and
 // every one is a fake (tribe-calculator's per-player/forum exports never mix a real off/snob
 // with a fake on one target); otherwise 'off'. An empty list stays 'off' (the legacy default).
+// Catapult requirements are real troops, so a catapult-only target is an 'off' target too —
+// the CATAPULT distinction lives on the attack rows, not the target.
 function targetTypeFor(requirements) {
   const reqs = requirements || [];
   return reqs.length && reqs.every(r => r.unitType === 'fake') ? 'fake' : 'off';
@@ -331,12 +348,13 @@ function importPlayerPlan(text) {
   const me = (DATA.settings.playerName || '').trim();
   if (me) parsed.forEach(p => p.requirements.forEach(r => { if (!r.attacker) r.attacker = me; }));
 
-  let added = 0, updated = 0, fakes = 0;
+  let added = 0, updated = 0, fakes = 0, cats = 0;
   parsed.forEach(p => {
     // A target whose every requirement is a fake is a FAKE target (tribe-calculator never mixes
     // real offs and fakes on one target); anything with a real off/snob stays an off target.
     const tt = targetTypeFor(p.requirements);
     if (tt === 'fake') fakes++;   // counted for the summary regardless of added-vs-updated
+    cats += p.requirements.filter(r => r.unitType === 'catapult').length;
     const existing = (p.villageId && DATA.targets.find(t => String(t.villageId) === String(p.villageId)))
                   || DATA.targets.find(t => t.x === p.x && t.y === p.y);
     if (existing) {
@@ -373,6 +391,7 @@ function importPlayerPlan(text) {
     .replace('{fakes}', fakes)
     .replace('{players}', senders.size)
     .replace('{senders}', senderList)
+    + (cats ? '\n' + t('alert_plan_cats').replace('{n}', String(cats)) : '')
     + (planDateISO ? '\n' + t('alert_plan_date').replace('{date}', planDateISO) : '')
     // Multi-date plan: normally every attack was dated individually (say so); if some carried
     // no recognizable day, warn that those fall back to the Auto-Generate date input.
@@ -398,9 +417,10 @@ function importOffTargets() {
   if (looksLikePlayerPlan(text)) { importPlayerPlan(text); return; }
   const parsed = parseOffPlanBB(text);
   if (!parsed.length) { alert(t('alert_no_targets_found')); return; }
-  let added = 0, updated = 0;
+  let added = 0, updated = 0, cats = 0;
   parsed.forEach(p => {
     const tt = targetTypeFor(p.requirements);
+    cats += p.requirements.filter(r => r.unitType === 'catapult').length;
     const existing = DATA.targets.find(t => t.x === p.x && t.y === p.y);
     if (existing) {
       if (p.player) existing.player = p.player;
@@ -423,7 +443,8 @@ function importOffTargets() {
   refreshDropdowns();
   document.getElementById('import-off-text').value = '';
   closePanel('import-off-panel');
-  alert(t('alert_off_imported').replace('{added}', added).replace('{updated}', updated));
+  alert(t('alert_off_imported').replace('{added}', added).replace('{updated}', updated)
+    + (cats ? '\n' + t('alert_plan_cats').replace('{n}', String(cats)) : ''));
 }
 
 function importFakeTargets() {

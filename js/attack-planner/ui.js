@@ -41,16 +41,15 @@ function togglePanel(id) {
   }
 }
 
+// Show the per-type extra row of the Add / Modify Attack forms: Noble Count for a snob train,
+// Catapults for a catapult attack. `rowId` is the form's noble row ('aa-noble-row' /
+// 'ma-noble-row'); its 'aa-'/'ma-' prefix names the sibling type select and catapult row.
 function onAttackTypeChange(rowId) {
-  const typeEl = rowId === 'aa-noble-row'
-    ? document.getElementById('aa-type')
-    : document.getElementById('ma-type');
-  const row = document.getElementById(rowId);
-  if (typeEl.value === 'snob') {
-    row.classList.remove('hidden');
-  } else {
-    row.classList.add('hidden');
-  }
+  const p = rowId.startsWith('aa-') ? 'aa' : 'ma';
+  const type = document.getElementById(`${p}-type`).value;
+  document.getElementById(`${p}-noble-row`).classList.toggle('hidden', type !== 'snob');
+  const catRow = document.getElementById(`${p}-cat-row`);
+  if (catRow) catRow.classList.toggle('hidden', type !== 'catapult');
 }
 
 function closeModal(id) {
@@ -292,6 +291,7 @@ function renderMtReqs() {
         <option value="axe"${sel('axe')}>🪓 1/2</option>
         <option value="snob"${sel('snob')}>👑 snob</option>
         <option value="fake"${sel('fake')}>💨 fake</option>
+        <option value="catapult"${sel('catapult')}>💥 cat</option>
       </select>
       <input type="text" value="${escHtml(r.attacker || '')}" oninput="mtReqs[${i}].attacker=this.value" placeholder="${t('lbl_player')}" style="${MT_REQ_INPUT};flex:1;min-width:100px">
       <input type="number" min="1" value="${r.count || 1}" oninput="mtReqs[${i}].count=parseInt(this.value)||1" title="${t('mt_count')}" style="${MT_REQ_INPUT};width:46px">
@@ -342,6 +342,8 @@ function normalizeReqs(reqs, villages) {
       // a well-shaped garbage date ("2026-13-45") would throw inside landingISO.
       const dateISO = (r.dateISO || '').trim();
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateISO) && !Number.isNaN(new Date(dateISO + 'T00:00:00').getTime())) out.dateISO = dateISO;
+      // Snob trains always keep their size; any other kind only a count above 1 (for a
+      // catapult requirement the count is its catapult number, 1 = unknown → "all").
       const cnt = Math.max(1, parseInt(r.count, 10) || 1);
       if (r.unitType === 'snob' || cnt > 1) out.count = cnt;
       // Catapult-target building from the plan import — carried through unchanged (the
@@ -400,8 +402,8 @@ function deleteTarget(id) {
 }
 
 function reqBadgeHtml(unitType) {
-  const cls = unitType === 'ram' ? 'req-ram' : unitType === 'snob' ? 'req-snob' : unitType === 'fake' ? 'req-fake' : 'req-axe';
-  const label = unitType === 'ram' ? '⚔ off' : unitType === 'snob' ? '👑 snob' : unitType === 'fake' ? '💨 fake' : '🪓 1/2';
+  const cls = unitType === 'ram' ? 'req-ram' : unitType === 'snob' ? 'req-snob' : unitType === 'fake' ? 'req-fake' : unitType === 'catapult' ? 'req-catapult' : 'req-axe';
+  const label = unitType === 'ram' ? '⚔ off' : unitType === 'snob' ? '👑 snob' : unitType === 'fake' ? '💨 fake' : unitType === 'catapult' ? '💥 cat' : '🪓 1/2';
   return `<span class="req-badge ${cls}">${label}</span>`;
 }
 
@@ -415,7 +417,8 @@ function fmtTimeWindow(from, to) {
 function renderRequirements(reqs) {
   if (!reqs || !reqs.length) return '<span class="text-dim">—</span>';
   return reqs.map(r => {
-    const cnt  = (r.unitType === 'snob' && r.count > 1) ? `<small style="color:#d4b483;font-weight:bold">${r.count}× </small>` : '';
+    // Snob trains show their size; catapult attacks their planned catapult number (when known).
+    const cnt  = ((r.unitType === 'snob' || r.unitType === 'catapult') && r.count > 1) ? `<small style="color:#d4b483;font-weight:bold">${r.count}× </small>` : '';
     // A requirement with its own arrival date (multi-date plan import) shows its day-of-month
     // before the window, mirroring the tribe-calculator export ("12 · 05:00–06:00").
     const day  = /^\d{4}-\d{2}-\d{2}$/.test(r.dateISO || '') ? parseInt(r.dateISO.slice(8), 10) : null;

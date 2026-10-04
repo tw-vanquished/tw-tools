@@ -13,6 +13,7 @@ function addAttack() {
   const type       = document.getElementById('aa-type').value;
   const speed      = document.getElementById('aa-speed').value;
   const nobleCount = parseInt(document.getElementById('aa-nobles').value) || 1;
+  const catCount   = parseInt(document.getElementById('aa-cats').value) || 0;   // 0 = all the village's catapults
   const landingVal = document.getElementById('aa-landing').value;
 
   if (!fromId)     { alert(t('alert_select_from'));   return; }
@@ -26,6 +27,7 @@ function addAttack() {
     type,
     speed:       speed || '',   // '' = travel at the type's pace; sword/axe/lc override timing only
     nobleCount:  type === 'snob' ? nobleCount : 1,
+    catCount:    type === 'catapult' ? catCount : 0,
     landingTime: new Date(landingVal).toISOString(),
     manual:      true,   // survives Auto-Generate (which replaces generated attacks)
     sent:        false
@@ -43,6 +45,7 @@ function editAttack(id) {
   document.getElementById('ma-type').value    = a.type;
   document.getElementById('ma-speed').value   = a.speed || '';
   document.getElementById('ma-nobles').value  = a.nobleCount || 1;
+  document.getElementById('ma-cats').value    = a.catCount || 0;
   document.getElementById('ma-landing').value = localDatetimeValue(new Date(a.landingTime).getTime());
 
   // populate dropdowns
@@ -50,9 +53,8 @@ function editAttack(id) {
   document.getElementById('ma-from').value   = a.fromId;
   document.getElementById('ma-target').value = a.targetId;
 
-  // show/hide noble row
-  const nobleRow = document.getElementById('ma-noble-row');
-  nobleRow.classList.toggle('hidden', a.type !== 'snob');
+  // show/hide the noble-count / catapult-count rows for the attack's type
+  onAttackTypeChange('ma-noble-row');
 
   openModal('modal-attack');
 }
@@ -67,6 +69,7 @@ function saveAttack() {
   a.type       = document.getElementById('ma-type').value;
   a.speed      = document.getElementById('ma-speed').value || '';
   a.nobleCount = parseInt(document.getElementById('ma-nobles').value) || 1;
+  a.catCount   = a.type === 'catapult' ? (parseInt(document.getElementById('ma-cats').value) || 0) : 0;
   a.landingTime = new Date(landingVal).toISOString();
   closeModal('modal-attack');
   saveData();
@@ -101,8 +104,9 @@ function clearAllAttacks() {
 
 // Offensive-Plan requirement kinds that spend the same troops as an attack of each type: an
 // off attack consumes a complete/half (ram/axe) requirement's village, a snob its noble
-// train, a fake only one ram + one spy (so a fake never makes its village "busy").
-const REPLACE_REQ_UNITS = { off: ['ram', 'axe'], snob: ['snob'], fake: ['fake'] };
+// train, a catapult attack its catapults, a fake only one ram + one spy (so a fake never
+// makes its village "busy").
+const REPLACE_REQ_UNITS = { off: ['ram', 'axe'], snob: ['snob'], fake: ['fake'], catapult: ['catapult'] };
 // An off replacement must be a real off: weaker villages are never offered.
 const REPLACE_MIN_OFF_POW = 300000;
 
@@ -141,13 +145,14 @@ function assignedSenders(excludeId) {
     // this attack's own plan pin — the village is exactly what we're replacing
     if (excluded && v.id === excluded.fromId && tg.id === excluded.targetId
         && (REPLACE_REQ_UNITS[excluded.type] || []).includes(r.unitType)) return;
-    add(v.id, tg.id, r.unitType === 'snob' ? 'snob' : 'off');
+    add(v.id, tg.id, r.unitType === 'snob' ? 'snob' : r.unitType === 'catapult' ? 'catapult' : 'off');
   }));
   return map;
 }
 
 // Every village that could take over `atk`: it holds the troops the attack type needs (a noble
-// for a snob, a ram for a fake, ≥ REPLACE_MIN_OFF_POW off power for an off), it isn't the current origin, and its
+// for a snob, a ram for a fake, the planned catapults — at least one — for a catapult attack,
+// ≥ REPLACE_MIN_OFF_POW off power for an off), it isn't the current origin, and its
 // send window is still open — sending NOW or LATER still lands inside the landing window
 // (sendEndMs ≥ now). Free (🏠) villages come first, strongest first within each group.
 // `late` counts the villages hidden because their send window has already closed.
@@ -159,8 +164,9 @@ function replaceCandidates(atk, now = Date.now()) {
   const landMs = new Date(atk.landingTime).getTime();
   const span   = windowSpanMs(atk.windowFrom, atk.windowTo);
   const busy   = assignedSenders(atk.id);
-  const holds = v => atk.type === 'snob' ? (v.nobles || 0) > 0
-                   : atk.type === 'fake' ? (v.rams || 0) > 0
+  const holds = v => atk.type === 'snob'     ? (v.nobles || 0) > 0
+                   : atk.type === 'fake'     ? (v.rams || 0) > 0
+                   : atk.type === 'catapult' ? (v.cats || 0) >= Math.max(1, atk.catCount || 0)
                    : calcOffPow(v) >= REPLACE_MIN_OFF_POW;
   const rows = [];
   let late = 0;
@@ -246,10 +252,11 @@ function replaceRowHtml(atk, r, now) {
   const status = r.free
     ? `<span class="rp-free">${t('rp_free')}</span>`
     : r.assignedTo.map(e =>
-        `<span class="rp-busy" title="${escHtml(t('rp_busy_title'))}">${e.kind === 'snob' ? '👑' : '⚔'} → ${tgtCoord(e.targetId)}</span>`
+        `<span class="rp-busy" title="${escHtml(t('rp_busy_title'))}">${e.kind === 'snob' ? '👑' : e.kind === 'catapult' ? '💥' : '⚔'} → ${tgtCoord(e.targetId)}</span>`
       ).join(' ');
   const powCell = `${r.pow.toLocaleString()} ${offTierBadge(r.pow)}`
-    + (atk.type === 'snob' ? ` <small style="color:#d0c040">👑×${v.nobles || 0}</small>` : '');
+    + (atk.type === 'snob' ? ` <small style="color:#d0c040">👑×${v.nobles || 0}</small>` : '')
+    + (atk.type === 'catapult' ? ` <small style="color:#c080f0">💥×${v.cats || 0}</small>` : '');
   const sp = n => String(n).padStart(2, '0');
   const fmtSend = ms => { const d = new Date(ms); return `${sp(d.getDate())}/${sp(d.getMonth() + 1)} ${sp(d.getHours())}:${sp(d.getMinutes())}:${sp(d.getSeconds())}`; };
   let sendCell = fmtSend(r.sendMs);
@@ -478,8 +485,8 @@ function renderAttacks() {
     const playerName = (rawPlayer && playerId) ? twLink(playerUrl(playerId), escHtml(rawPlayer)) : pLabel;
     // ── Unassigned placeholder row ──
     if (a.type === 'unassigned') {
-      const unitLabel = a.unitType === 'snob' ? '👑 snob' : a.unitType === 'axe' ? '🪓 1/2' : '⚔ off';
-      const unitCls   = a.unitType === 'snob' ? 'req-snob' : a.unitType === 'axe' ? 'req-axe' : 'req-ram';
+      const unitLabel = a.unitType === 'snob' ? '👑 snob' : a.unitType === 'axe' ? '🪓 1/2' : a.unitType === 'catapult' ? '💥 cat' : '⚔ off';
+      const unitCls   = a.unitType === 'snob' ? 'req-snob' : a.unitType === 'axe' ? 'req-axe' : a.unitType === 'catapult' ? 'req-catapult' : 'req-ram';
       const winText   = fmtTimeWindow(a.windowFrom, a.windowTo);
       const winLabel  = winText
         ? `<span style="font-family:monospace;color:#6090c0;font-size:11px">${escHtml(winText)}</span>`
@@ -540,7 +547,7 @@ function renderAttacks() {
       <td>${targetCoord}</td>
       <td>${villageName}</td>
       <td>${playerName}</td>
-      <td>${typeBadge}${a.type === 'snob' ? ` <small style="color:#6090e0">×${a.nobleCount}</small>` : ''}${a.speed && BASE_MIN[a.speed] ? ` <small style="color:#c0a060">@${SPEED_LABEL[a.speed] || a.speed}</small>` : ''}</td>
+      <td>${typeBadge}${a.type === 'snob' ? ` <small style="color:#6090e0">×${a.nobleCount}</small>` : ''}${a.type === 'catapult' ? ` <small style="color:#c080f0">×${a.catCount || (village ? (village.cats || 0) : '?')}</small>` : ''}${a.speed && BASE_MIN[a.speed] ? ` <small style="color:#c0a060">@${SPEED_LABEL[a.speed] || a.speed}</small>` : ''}</td>
       <td>${a.type === 'off' && village ? `${calcOffPow(village).toLocaleString()} ${offTierBadge(calcOffPow(village))}` : '<span class="text-dim">—</span>'}</td>
       <td>${a.building ? `<span style="color:#c08040;font-weight:bold">${escHtml(a.building)}</span>` : '<span class="text-dim">—</span>'}</td>
       <td>${distCell}</td>

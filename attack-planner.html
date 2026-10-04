@@ -90,11 +90,16 @@
           <option value="off" data-i18n="opt_off">Off (Rams)</option>
           <option value="fake" data-i18n="opt_fake">Fake (1 spy/1 ram)</option>
           <option value="snob" data-i18n="opt_snob">Snob (Nobleman)</option>
+          <option value="catapult" data-i18n="opt_catapult">Catapult</option>
         </select>
       </div>
       <div class="form-group hidden" id="aa-noble-row">
         <label data-i18n="lbl_noble_count">Noble Count</label>
         <input type="number" id="aa-nobles" value="1" min="1" max="4">
+      </div>
+      <div class="form-group hidden" id="aa-cat-row">
+        <label data-i18n="lbl_cat_count">Catapults (0 = all)</label>
+        <input type="number" id="aa-cats" value="0" min="0">
       </div>
       <div class="form-group">
         <label data-i18n="lbl_speed">Speed (timing)</label>
@@ -802,11 +807,16 @@
           <option value="off" data-i18n="opt_off">Off (Rams)</option>
           <option value="fake" data-i18n="opt_fake">Fake (1 spy/1 ram)</option>
           <option value="snob" data-i18n="opt_snob">Snob (Nobleman)</option>
+          <option value="catapult" data-i18n="opt_catapult">Catapult</option>
         </select>
       </div>
       <div class="form-group hidden" id="ma-noble-row">
         <label data-i18n="lbl_noble_count">Noble Count</label>
         <input type="number" id="ma-nobles" value="1" min="1" max="4">
+      </div>
+      <div class="form-group hidden" id="ma-cat-row">
+        <label data-i18n="lbl_cat_count">Catapults (0 = all)</label>
+        <input type="number" id="ma-cats" value="0" min="0">
       </div>
       <div class="form-group">
         <label data-i18n="lbl_speed">Speed (timing)</label>
@@ -872,7 +882,7 @@
 <script src="js/attack-planner/scavenge.js"></script>
 <script src="js/attack-planner/init.js"></script>
 <div class="footer">
-  Developed by <span>Vanquished</span> &nbsp;·&nbsp; v1.10.1 &nbsp;·&nbsp; 2026-09-12
+  Developed by <span>Vanquished</span> &nbsp;·&nbsp; v1.11.0 &nbsp;·&nbsp; 2026-10-04
 </div>
 </body>
 </html>

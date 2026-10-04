@@ -36,7 +36,7 @@ const IDB_DB    = 'apDbDir';
 //  sword/axe/lc are optional per-attack timing overrides (see atk.speed) so the
 //  user can compute send/landing times at a faster unit's pace — timing only,
 //  the send-URL army is unchanged.
-const BASE_MIN = { off: 30, fake: 30, snob: 35, axe: 18, sword: 22, lc: 10 };
+const BASE_MIN = { off: 30, fake: 30, snob: 35, catapult: 30, axe: 18, sword: 22, lc: 10 };
 // Short tags shown next to a row's type badge when a timing-speed override is set.
 const SPEED_LABEL = { axe: 'Axe', sword: 'Sword', lc: 'LC' };
 
@@ -100,15 +100,21 @@ function computeAttackRow(atk) {
     atk.type,
     village,
     atk.nobleCount,
-    atk.dividedOff
+    atk.dividedOff,
+    atk.catCount
   );
   return { d, tMs, sendMs, sendEndMs, landMs, url };
 }
 
-function buildAttackUrl(server, fromVillageId, targetVillageId, type, village, nobleCount, dividedOff = false) {
+function buildAttackUrl(server, fromVillageId, targetVillageId, type, village, nobleCount, dividedOff = false, catCount = 0) {
   const base = `https://${server}/game.php?village=${fromVillageId}&screen=place&target=${targetVillageId}&attack=true`;
   if (type === 'fake') {
     return `${base}&spy=1&ram=1`;
+  }
+  // catapult attack (tribe-calculator catapult rows): only catapults — the planned count when
+  // the plan named one, otherwise every catapult the village owns (forum export has no count).
+  if (type === 'catapult') {
+    return `${base}&catapult=${catCount || village.cats || 0}`;
   }
   if (type === 'off') {
     return `${base}&axe=${village.axes||0}&light=${village.lc||0}&ram=${village.rams||0}&catapult=${village.cats||0}`;
