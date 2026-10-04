@@ -53,6 +53,12 @@ const RI_CAT_RAM_OFF = 200;
 // Facts stay observations: the client compares dead.t vs alive.t at render time.
 const RI_DEAD_MIN = 5000;  // farm pop — only a half-nuke-or-bigger wipe flags a village
 const RI_ALIVE_MIN = 1000; // farm pop — survivors above this retract a dead claim
+// 🎯 `lastReal` (2026-09-06, twstats "Ataque real en otro pueblo"): the NEWEST attack a
+// village sent with a REAL army — farm pop ≥ RI_REAL_MIN, the same half-nuke floor as
+// `dead`. sent/sentBig keep the LARGEST army ever; this slot answers "when and where did
+// its real army last land?", which the incoming-attack page compares with a command's
+// departure (landed elsewhere after the launch ⇒ that command cannot be the real one).
+const RI_REAL_MIN = 5000;  // farm pop — a real attack, never a token fake or a farm run
 
 function riSum(units, pool) {
   if (!units) return 0;
@@ -142,7 +148,8 @@ function riMergeReports(store, reports) {
       const dFought = Object.keys(dq).length > 0;
       const dAllDied = dFought && Object.keys(dq).every((u) => (+dl[u] || 0) >= dq[u]);
       if (dAllDied && !r.defenderTroopsAway && spied && riSpiesIntact(r)) {
-        if (!v.dead || t >= v.dead.t) v.dead = { t, kind: 'def', pop: riPop(dq) };
+        // `rid` = the report of the death (2026-09-06) — twstats links the 💀 flag to it.
+        if (!v.dead || t >= v.dead.t) v.dead = { t, kind: 'def', pop: riPop(dq), ...(r.reportId != null ? { rid: String(r.reportId) } : {}) };
       }
       if ((dFought && !dAllDied) || riTotal(riUnits(r.defenderTroopsAway)) > 0) {
         if (!v.alive || t >= v.alive.t) v.alive = { t };
@@ -182,6 +189,16 @@ function riMergeReports(store, reports) {
           v.sentCat.n = n;
         }
       }
+      // 🎯 lastReal: newest REAL attack sent (pop ≥ RI_REAL_MIN), newest wins
+      // regardless of size — a 1-ram fake never touches it. Carries `pid` (the
+      // protected-tribe strip judges it like sent/sentBig), the reportId (`rid`,
+      // the UI links to the proof) and the target coord (`tgt`).
+      if (pop >= RI_REAL_MIN && (!v.lastReal || t >= v.lastReal.t)) {
+        v.lastReal = { t, pop, ...(pid ? { pid } : {}),
+          ...(r.reportId != null ? { rid: String(r.reportId) } : {}),
+          ...(typeof r.defenderX === 'number' && typeof r.defenderY === 'number'
+            ? { tgt: r.defenderX + '|' + r.defenderY } : {}) };
+      }
       // 💀 dead (attacker side): the defender won — the whole sent army died.
       // Only a real army (pop floor) proves anything; substantial survivors
       // coming home are living troops (`alive`), a surviving token fake is not.
@@ -189,7 +206,11 @@ function riMergeReports(store, reports) {
       const surv = {};
       for (const k in units) { const s = units[k] - (+aLost[k] || 0); if (s > 0) surv[k] = s; }
       if (!Object.keys(surv).length) {
-        if (pop >= RI_DEAD_MIN && (!v.dead || t >= v.dead.t)) v.dead = { t, kind: 'off', pop };
+        if (pop >= RI_DEAD_MIN && (!v.dead || t >= v.dead.t)) {
+          v.dead = { t, kind: 'off', pop, ...(r.reportId != null ? { rid: String(r.reportId) } : {}),
+            ...(typeof r.defenderX === 'number' && typeof r.defenderY === 'number'
+              ? { tgt: r.defenderX + '|' + r.defenderY } : {}) };
+        }
       } else if (riPop(surv) >= RI_ALIVE_MIN) {
         if (!v.alive || t >= v.alive.t) v.alive = { t };
       }
@@ -218,6 +239,20 @@ function riIdentity(v, t, id, name, playerId, playerName) {
   }
 }
 
+// A sent-side slot (sent / sentBig / sentCat / lastReal) is the army of whoever owned
+// the village WHEN it was sent (`pid`). After a conquest the identity snapshot
+// (v.playerId = owner in the newest report) moves on while these slots keep the
+// previous owner's largest / newest army — gone with the conquest, so classification
+// and display skip it. The MERGE keeps it unchanged (it must stay identical to the
+// Worker's reports-merge.mjs). A slot without pid (older stores) or a village without
+// an identity is kept.
+function riOwnSent(v, slot) {
+  const s = v && v[slot];
+  if (!s) return null;
+  if (s.pid == null || v.playerId == null) return s;
+  return String(s.pid) === String(v.playerId) ? s : null;
+}
+
 // ── Classification (FastNotes ladder + the away-unknown caveat) ──
 // Returns { cls: 'off'|'def'|'mixed'|'spy'|'empty'|'unknown', sure: bool }.
 // `sure` is false whenever the verdict could flip if the unseen away troops
@@ -228,7 +263,8 @@ function riClassify(v) {
   const awayKnown = !!v.away;                       // seen, or confirmed-empty via spy data
   const away = awayKnown ? v.away.units : null;
 
-  const offSent = v.sent ? v.sent.off : 0;
+  const sent = riOwnSent(v, 'sent');                // current owner's armies only
+  const offSent = sent ? sent.off : 0;
   const offAway = riSum(away, RI_OFF_POOL), defAway = riSum(away, RI_DEF_POOL);
   const offHome = riSum(home, RI_OFF_POOL), defHome = riSum(home, RI_DEF_POOL);
   const off = offHome + offAway, def = defHome + defAway;
@@ -285,6 +321,7 @@ function riCombineVillages(a, b) {
   const bld = newer(a.bld, b.bld); if (bld) out.bld = bld;
   const dead = newer(a.dead, b.dead); if (dead) out.dead = dead;
   const alive = newer(a.alive, b.alive); if (alive) out.alive = alive;
+  const lastReal = newer(a.lastReal, b.lastReal); if (lastReal) out.lastReal = lastReal;
   if (a.sent || b.sent) {
     out.sent = !a.sent ? b.sent : !b.sent ? a.sent
       : ((b.sent.off > a.sent.off || (b.sent.off === a.sent.off && (b.sent.t || 0) > (a.sent.t || 0))) ? b.sent : a.sent);

@@ -481,11 +481,13 @@
     var m = /^(\d{1,3})\|(\d{1,3})$/.exec(String(s || "").trim());
     return m ? Number(m[1]) + "|" + Number(m[2]) : null;
   }
+  // One export → its readable attack commands, each keyed by target + origin
+  // + exact arrival (kSec) and by that plus the arrival milliseconds (k).
   function parseOrders(json) {
     if (!json || !Array.isArray(json.targets)) {
       throw new Error("no parece un incoming_orders*.json (falta la lista targets)");
     }
-    var exact = {}, bySec = {}, n = 0;
+    var cmds = [];
     json.targets.forEach(function (t) {
       var tKey = ordCoord(t.coords);
       (t.commands || []).forEach(function (c) {
@@ -493,14 +495,37 @@
         var oKey = ordCoord(c.origin_coords);
         var arr = ordArrival(c.arrival);
         if (!tKey || !oKey || !arr || !c.units) return;
-        n++;
         var kSec = tKey + ">" + oKey + "@" + arr.t;
-        exact[kSec + ":" + arr.ms] = c;
-        (bySec[kSec] = bySec[kSec] || []).push(c);
+        cmds.push({ k: kSec + ":" + arr.ms, kSec: kSec, c: c });
       });
     });
-    if (!n) throw new Error("el archivo no contiene ningún comando de ataque legible");
-    return { exact: exact, bySec: bySec, commands: n, file: "" };
+    if (!cmds.length) throw new Error("el archivo no contiene ningún comando de ataque legible");
+    return { cmds: cmds, exportedAt: Number(json.exported_at) || 0 };
+  }
+  // Several exports (one per batch, or overlapping ones taken at different
+  // moments) become ONE command set. Across files, exact key + command id is
+  // the command's identity: a command present in two files counts once (the
+  // newer export wins), so an overlap can never manufacture a false
+  // second-level ambiguity. Within one file nothing is collapsed — two ms-less
+  // commands in the same second there ARE a train, and stay ambiguous.
+  function buildOrders(parsed) {
+    var sorted = parsed.slice().sort(function (a, b) { return a.exportedAt - b.exportedAt; });
+    var list = [], seen = {};
+    sorted.forEach(function (p, fi) {
+      p.cmds.forEach(function (x) {
+        var dk = x.k + "#" + (x.c.id != null ? String(x.c.id) : "");
+        var slot = seen[dk];
+        if (slot && slot.file !== fi) { list[slot.i] = x; seen[dk] = { file: fi, i: slot.i }; return; }
+        seen[dk] = { file: fi, i: list.length };
+        list.push(x);
+      });
+    });
+    var exact = {}, bySec = {};
+    list.forEach(function (x) {
+      exact[x.k] = x.c;
+      (bySec[x.kSec] = bySec[x.kSec] || []).push(x.c);
+    });
+    return { exact: exact, bySec: bySec, commands: list.length, files: [], errors: [] };
   }
   function orderFor(a) {
     if (!state.orders || !a.target) return null;
@@ -519,7 +544,7 @@
   function matchOrders() {
     if (!ordersFeatureEnabled()) return;   // nothing to match, nothing to show
     var el = $("ordersNote");
-    if (!state.orders) { el.hidden = true; buildOrdersFilters(); return; }
+    if (!state.orders) { el.hidden = true; buildOrdersFilters(); refreshIgnoreBtn(); return; }
     var total = 0, matched = 0;
     state.rows.forEach(function (r) {
       if (!r.attack) return;
@@ -527,13 +552,18 @@
       r.attack.order = orderFor(r.attack);
       if (r.attack.order) matched++;
     });
-    el.textContent = "Órdenes .json" + (state.orders.file ? " (" + state.orders.file + ")" : "") +
+    var files = state.orders.files || [];
+    el.textContent = "Órdenes .json" +
+      (files.length ? " (" + (files.length > 1 ? files.length + " archivos: " : "") + files.join(", ") + ")" : "") +
       ": " + state.orders.commands + " comandos cargados" +
       (total ? " · " + matched + " de " + total +
         " ataques emparejados (objetivo + origen + hora de llegada exacta)"
-             : " — se emparejarán al analizar tus entrantes");
+             : " — se emparejarán al analizar tus entrantes") +
+      (state.orders.errors && state.orders.errors.length
+        ? " · No se pudo leer " + state.orders.errors.join(" · ") : "");
     el.hidden = false;
     buildOrdersFilters();
+    refreshIgnoreBtn();
   }
 
   // Units of a matched command: the game's size icon + one chip per nonzero
@@ -542,12 +572,33 @@
   var ORD_UNIT_ORDER = ["spear", "sword", "axe", "archer", "spy", "light",
                         "marcher", "heavy", "ram", "catapult", "knight", "snob"];
   var ORD_SIZE_ES = { small: "pequeño", medium: "mediano", large: "grande" };
+  // Catapult target (exporter v2.1+: catapult_target = the game's building key,
+  // catapult_target_name = its name in the exporter's game language). Shown as
+  // "200 🏹 (Granja)" right after the catapult chip — the Spanish name from this
+  // map first (the site is Spanish whatever world language exported the file),
+  // the exported name as fallback, the bare key as a last resort. Every building
+  // the confirm screen offers (game order), not just the 5 the hover card lists.
+  var ORD_BLD_ES = { main: "Edificio Principal", barracks: "Cuartel", stable: "Cuadra", garage: "Taller",
+                     snob: "Academia", smith: "Herrería", place: "Plaza de reuniones", statue: "Estatua",
+                     market: "Mercado", wood: "Leñador", stone: "Barrera", iron: "Mina de hierro",
+                     farm: "Granja", storage: "Almacén", hide: "Escondrijo", wall: "Muralla" };
+  function ordCatTarget(c) {
+    var key = c.catapult_target != null ? String(c.catapult_target) : "";
+    var name = c.catapult_target_name != null ? String(c.catapult_target_name) : "";
+    return ORD_BLD_ES[key] || name || key;
+  }
   function ordersCellHtml(c) {
+    var bld = ordCatTarget(c);
     var chips = ORD_UNIT_ORDER.filter(function (u) { return (c.units[u] || 0) > 0; })
       .map(function (u) {
+        var tail = (u === "catapult" && bld)
+          ? ' <span class="ord-bld" title="Edificio objetivo de las catapultas (según el .json de órdenes)">(' +
+            TW.esc(bld) + ")</span>"
+          : "";
         return '<span class="ord-unit" title="' + TW.esc(UNIT_ES[u] || u) +
+          (u === "catapult" && bld ? " → " + TW.esc(bld) : "") +
           '"><img class="ord-ic" src="../icons/units/' + u + '.png" alt="' +
-          TW.esc(UNIT_ES[u] || u) + '">' + TW.commas(c.units[u]) + "</span>";
+          TW.esc(UNIT_ES[u] || u) + '">' + TW.commas(c.units[u]) + tail + "</span>";
       });
     var size = ORD_SIZE_ES[c.size]
       ? '<img class="ord-ic ord-size" src="../icons/units/attack_' + c.size +
@@ -611,6 +662,264 @@
       }).join(" ");
     box.innerHTML = boxes ? '<span class="fflags-h">Filtros de órdenes:</span> ' + boxes : "";
     box.hidden = !boxes;
+  }
+
+  // === «Copiar IDs fakes» + «Script ignorar fakes» (2026-08-29, split 2026-08-30) =====
+  // Once a .json is matched we KNOW which incomings are token fakes: a matched
+  // command with ≤ 2 units in total and no noble. The exporter's command id is
+  // the game's own command id, and the game's incomings overview
+  // (screen=overview_villages&mode=incomings) renders one checkbox per row
+  // named `id_<commandId>` inside #incomings_form — the same handle RedAlert's
+  // Fake Finder ticks. Two pieces, installed once / used every time:
+  //   • «Script ignorar fakes» — a STATIC `javascript:` bookmarklet (drag the link
+  //     to the bookmarks bar, or click to copy it into a quickbar entry). In the
+  //     game it prompts for the id list, ticks exactly those rows and remembers
+  //     the list in localStorage so the next page of a paginated overview only
+  //     needs OK. The player then presses the game's own bulk button
+  //     (Ignorar / Renombrar). Nothing about the current upload is baked in.
+  //   • «Copiar IDs fakes (N)» — copies the comma-separated ids of the confirmed
+  //     fakes of the current analysis, to paste into that prompt.
+  // Strictly the .json verdict — the page's own flags/filters play no part.
+  var IGNORE_MAX_UNITS = 2;
+  function ignorableOrderIds() {
+    var seen = {}, ids = [];
+    if (!ordersFeatureEnabled() || state.mode !== "attacks") return ids;
+    state.rows.forEach(function (r) {
+      var o = r.attack && r.attack.order;
+      if (!o || o.id == null || o.id === "" || o.contains_snob) return;
+      if ((o.units.snob || 0) > 0 || ordUnitTotal(o) > IGNORE_MAX_UNITS) return;
+      var id = String(o.id);
+      if (!/^\d+$/.test(id) || seen[id]) return;   // ids are numeric in-game; never inject text
+      seen[id] = true;
+      ids.push(id);
+    });
+    return ids;
+  }
+  // The in-game script — written as a REAL function here and turned into the
+  // `javascript:` bookmarklet by buildIgnoreScript() via Function#toString, so
+  // the tests run the very same source. Rules for this function's body: plain
+  // ES5, no `//` line comments (the newline collapse would swallow the rest of
+  // the line), no template literals, no `%` (javascript: URLs are percent-
+  // decoded by browsers), nothing from this page's scope (it runs in the game).
+  // Behaviour: on any screen without #incomings_table → error toast. Otherwise
+  // opens a small dialog: IDs textarea (pre-filled from localStorage) + name
+  // field (also remembered) + «Seleccionar» / «Seleccionar y renombrar» /
+  // «Cerrar». Only digit runs are read from the paste (commas, spaces, newlines,
+  // stray text all fine), deduped, order kept. Empty IDs → clears the stored
+  // list. Select = uncheck every #incomings_form box, tick `id_<id>`, toast
+  // `n de N fakes seleccionados` (+ hint when some are on another page or have
+  // landed) — the player then presses the game's own Ignorar. Rename = the same
+  // selection, then each FOUND row is renamed through the game's own QuickEdit
+  // pencil (`span.quickedit[data-id]` → .rename-icon click → input[type=text]
+  // value → input[type=button] click, value set on the NEXT tick because
+  // QuickEdit builds its input asynchronously), 160 ms apart — the pacing
+  // RedAlert's AS: tagger has used in the wild for years (user's choice); the
+  // game's request limiter is the real ceiling; the checkboxes stay ticked so
+  // Ignorar can follow. The game's localStorage is per world (one origin per
+  // world), so the keys need no world.
+  function igInGame() {
+    var K = 'twstatsIgnorarFakes', KN = 'twstatsIgnorarFakesNombre', D = document;
+    var tbl = D.getElementById('incomings_table');
+    var say = function (ok, m) {
+      if (window.UI && UI.SuccessMessage) { if (ok) { UI.SuccessMessage(m); } else { UI.ErrorMessage(m); } } else { alert(m); }
+    };
+    if (!tbl) { say(false, 'Abre Resumen → Entrantes (ataques) y vuelve a ejecutar el script.'); return; }
+    var ls = function (k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+    var st = function (k, v) { try { if (v) { localStorage.setItem(k, v); } else { localStorage.removeItem(k); } } catch (e) {} };
+    var old = D.getElementById('twsIF');
+    if (old) { old.parentNode.removeChild(old); }
+    var box = D.createElement('div');
+    box.id = 'twsIF';
+    box.style.cssText = 'position:fixed;top:70px;left:0;right:0;margin:0 auto;width:440px;max-width:96vw;z-index:99999;background:rgb(244,228,188);border:2px solid rgb(125,81,15);border-radius:4px;padding:10px;font:12px Verdana,Arial,sans-serif;color:rgb(0,0,0);box-shadow:0 0 14px rgba(0,0,0,0.5);text-align:left';
+    box.innerHTML = '<b>Fakes confirmados (twstats)</b>' +
+      '<textarea id="twsIFids" rows="6" style="display:block;width:416px;max-width:calc(96vw - 24px);box-sizing:border-box;margin:6px 0" placeholder="IDs de los fakes: twstats → Entrantes → «Copiar IDs fakes»"></textarea>' +
+      '<label>Nombre: <input id="twsIFname" type="text" maxlength="32" style="width:240px" placeholder="para «Seleccionar y renombrar»"></label>' +
+      '<div style="margin-top:8px;text-align:right">' +
+      '<button type="button" id="twsIFsel">Seleccionar</button> ' +
+      '<button type="button" id="twsIFren">Seleccionar y renombrar</button> ' +
+      '<button type="button" id="twsIFx">Cerrar</button></div>' +
+      '<div style="margin-top:6px;color:rgb(96,48,0)">Se recuerdan los IDs y el nombre (lista paginada: vuelve a ejecutar y pulsa). IDs vacíos = borrar la lista guardada. Tras seleccionar, pulsa el botón Ignorar del juego.</div>';
+    D.body.appendChild(box);
+    var ta = D.getElementById('twsIFids'), nm = D.getElementById('twsIFname');
+    ta.value = ls(K); nm.value = ls(KN);
+    var close = function () { if (box.parentNode) { box.parentNode.removeChild(box); } };
+    var parse = function () {
+      var seen = {}, ids = [], m = ta.value.match(/\d+/g) || [];
+      for (var k = 0; k < m.length; k++) { if (!seen[m[k]]) { seen[m[k]] = true; ids.push(m[k]); } }
+      return ids;
+    };
+    var pick = function (ids) {
+      var all = D.querySelectorAll('#incomings_form input[type=checkbox]'), found = [];
+      for (var i = 0; i < all.length; i++) { all[i].checked = false; }
+      for (var j = 0; j < ids.length; j++) {
+        var c = tbl.querySelector('input[name="id_' + ids[j] + '"]');
+        if (c) { c.checked = true; found.push(ids[j]); }
+      }
+      return found;
+    };
+    var go = function (rename) {
+      var ids = parse();
+      if (!ids.length) { st(K, ''); say(true, 'Lista de fakes borrada.'); return; }
+      st(K, ids.join(','));
+      var name = nm.value.replace(/^\s+|\s+$/g, '');
+      if (rename && !name) { say(false, 'Escribe el nombre para renombrar.'); nm.focus(); return; }
+      var found = pick(ids);
+      var msg = found.length + ' de ' + ids.length + ' fakes seleccionados' +
+        (found.length < ids.length ? ' (el resto no está en esta página o ya llegó)' : '') + '.';
+      if (!rename) { say(found.length > 0, msg); close(); return; }
+      st(KN, name);
+      if (!found.length) { say(false, msg); return; }
+      close();
+      var i = 0, done = 0;
+      var step = function () {
+        var q = tbl.querySelector('span.quickedit[data-id="' + found[i] + '"]');
+        if (q) {
+          var pen = q.querySelector('.rename-icon');
+          if (pen) { pen.click(); }
+          setTimeout(function () {
+            var inp = q.querySelector('input[type=text]'), btn = q.querySelector('input[type=button]');
+            if (inp && btn) { inp.value = name; btn.click(); done++; }
+          }, 0);
+        }
+        i++;
+        if (i < found.length) {
+          if (window.UI && UI.InfoMessage) { UI.InfoMessage(i + '/' + found.length); }
+          setTimeout(step, 160);
+        } else {
+          setTimeout(function () {
+            say(done > 0, done + ' de ' + found.length + ' fakes renombrados' + (done < found.length ? ' (algunas filas no tenían el lápiz de renombrar)' : '') +
+              '; siguen seleccionados: pulsa Ignorar del juego si quieres ignorarlos.');
+          }, 300);
+        }
+      };
+      step();
+    };
+    D.getElementById('twsIFsel').onclick = function () { go(false); };
+    D.getElementById('twsIFren').onclick = function () { go(true); };
+    D.getElementById('twsIFx').onclick = close;
+    nm.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); go(true); } };
+    box.onkeydown = function (e) { if (e.key === 'Escape') { close(); } };
+    ta.focus();
+  }
+  // Bookmarklet = the function above, newlines collapsed to one line (a
+  // quickbar/bookmark URL is single-line). Safe because igInGame has no line
+  // comments and no multi-line literals — the test suite checks both.
+  function buildIgnoreScript() {
+    var src = igInGame.toString().replace(/\r?\n\s*/g, " ");
+    return "javascript:(" + src + ")();";
+  }
+  var IGNORE_SCRIPT = buildIgnoreScript();
+  // Button state — called from matchOrders() so it follows every analysis,
+  // upload, filter rebuild and Limpiar. The script link is static: visible
+  // whenever the feature is, never disabled.
+  function refreshIgnoreBtn() {
+    var btn = $("ignoreBtn"), link = $("ignoreScript");
+    if (!btn) return;
+    if (!ordersFeatureEnabled()) { btn.hidden = true; if (link) link.hidden = true; return; }
+    if (link && link.getAttribute("href") !== IGNORE_SCRIPT) link.setAttribute("href", IGNORE_SCRIPT);
+    var n = ignorableOrderIds().length;
+    btn.disabled = !n;
+    btn.textContent = "Copiar IDs fakes" + (n ? " (" + n + ")" : "");
+    btn.title = n
+      ? "Copia los IDs de los " + n + " ataques que el .json confirma como fake (≤ " + IGNORE_MAX_UNITS +
+        " unidades, sin noble). En el juego, en Resumen → Entrantes, ejecuta «Script ignorar fakes», pega los IDs y pulsa «Seleccionar» o «Seleccionar y renombrar»; luego pulsa el botón Ignorar del juego."
+      : "Se activa cuando algún ataque emparejado con el .json tiene ≤ " + IGNORE_MAX_UNITS + " unidades y ningún noble.";
+    var note = $("ignoreNote");
+    if (note && !n) note.hidden = true;
+  }
+  function copyText(text, done, failed) {
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { copyTextFallback(text, done, failed); });
+    } else {
+      copyTextFallback(text, done, failed);
+    }
+  }
+  function copyTextFallback(text, done, failed) {
+    var ok = false;
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed"; ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      ok = !!(document.execCommand && document.execCommand("copy"));
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    if (ok) done(); else failed();
+  }
+  function ignoreNoteShow(msg) {
+    var note = $("ignoreNote");
+    if (note) { note.textContent = msg; note.hidden = false; }
+  }
+
+  // «Copiar IDs ataques filtrados» (2026-09-06, filter panel): the order ids of
+  // every row that passes the filters CURRENTLY APPLIED — the table's own
+  // predicate — so any combination («Ataque real en otro pueblo», one player, a
+  // target, a time window…) can feed «Script ignorar fakes» or anything else.
+  // Ids exist only for rows matched to the .json de órdenes (the BBCode dump has
+  // none); unmatched rows are counted and reported, never invented.
+  function filteredOrderIds() {
+    var seen = {}, ids = [], unmatched = 0;
+    if (state.mode !== "attacks") return { ids: ids, unmatched: 0 };
+    state.rows.forEach(function (r) {
+      if (!passesFilters(r)) return;
+      var o = r.attack && r.attack.order;
+      var id = (o && o.id != null) ? String(o.id) : "";
+      if (!/^\d+$/.test(id)) { unmatched++; return; }   // numeric in-game ids only
+      if (seen[id]) return;
+      seen[id] = true;
+      ids.push(id);
+    });
+    return { ids: ids, unmatched: unmatched };
+  }
+  function fCopyNoteShow(msg) {
+    var note = $("fCopyNote");
+    if (note) { note.textContent = msg; note.hidden = false; }
+  }
+  function onCopyFilteredIds() {
+    var res = filteredOrderIds();
+    if (!res.ids.length) {
+      fCopyNoteShow(res.unmatched
+        ? "Ningún ataque filtrado tiene ID: los IDs vienen del .json de órdenes (" + res.unmatched + " sin emparejar)."
+        : "Ningún ataque pasa los filtros aplicados.");
+      return;
+    }
+    var list = res.ids.join(",");
+    copyText(list, function () {
+      fCopyNoteShow("IDs copiados — " + res.ids.length + " ataque" + (res.ids.length === 1 ? "" : "s") +
+        " que pasan los filtros aplicados" +
+        (res.unmatched ? " (" + res.unmatched + " más sin ID: no emparejados con el .json)" : "") +
+        ". Pégalos en «Script ignorar fakes» o donde los necesites.");
+    }, function () {
+      fCopyNoteShow("No se pudo copiar automáticamente; copia los IDs a mano: " + list);
+    });
+  }
+  // «Copiar IDs fakes» → the comma-separated id list of the current analysis.
+  function onIgnoreClick() {
+    var ids = ignorableOrderIds();
+    var note = $("ignoreNote");
+    if (!ids.length) { if (note) note.hidden = true; return; }
+    var list = ids.join(",");
+    copyText(list, function () {
+      ignoreNoteShow("IDs copiados — " + ids.length + " ataque" + (ids.length === 1 ? "" : "s") +
+        " fake (≤ " + IGNORE_MAX_UNITS + " unidades según el .json). En el juego abre Resumen → Entrantes, " +
+        "ejecuta «Script ignorar fakes» desde la barra rápida, pega los IDs en la ventana y pulsa «Seleccionar» (o «Seleccionar y renombrar»); luego pulsa el botón Ignorar del juego.");
+    }, function () {
+      // No clipboard (permissions / old browser): show the list so it can be copied by hand.
+      ignoreNoteShow("No se pudo copiar automáticamente; copia los IDs a mano: " + list);
+    });
+  }
+  // «Script ignorar fakes» link: dragging it to the bookmarks bar installs it
+  // as a bookmarklet; a CLICK must not run it here (it would only complain that
+  // this is not the incomings screen) — it copies the script for a quickbar entry.
+  function onIgnoreScriptClick(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    copyText(IGNORE_SCRIPT, function () {
+      ignoreNoteShow("Script copiado — en el juego: Ajustes → Barra rápida → Añadir nuevo enlace, pega el script en el campo del enlace (o arrastra este botón a la barra de marcadores del navegador). Se instala una sola vez; cada vez que lo ejecutes en Resumen → Entrantes te pedirá los IDs.");
+    }, function () {
+      ignoreNoteShow("No se pudo copiar automáticamente; arrastra el botón a la barra de marcadores o copia el script a mano: " + IGNORE_SCRIPT);
+    });
   }
 
   // === your attacked villages: Blindado / Esquivar =========================
@@ -721,7 +1030,7 @@
     var cv = state.byCoord[coord];
     var conqT = (cv && state.lastConquer[cv.id]) ? state.lastConquer[cv.id].t * 1000 : 0;
     var out = null;
-    ["home", "away", "bld", "sent", "sentBig", "sentCat", "dead", "alive"].forEach(function (k) {
+    ["home", "away", "bld", "sent", "sentBig", "sentCat", "dead", "alive", "lastReal"].forEach(function (k) {
       if (v[k] && (+v[k].t || 0) >= conqT) {
         if (!out) out = { lastT: v.lastT, id: v.id, name: v.name, playerId: v.playerId, playerName: v.playerName, maxT: 0 };
         out[k] = v[k];
@@ -750,6 +1059,42 @@
 
   function reportAgeTxt(t) {
     return (t && typeof riAge === "function") ? riAge(Date.now(), t) : "";
+  }
+
+  // 💀 badge age (2026-09-06): measured against the COMMAND's departure, not
+  // against now. "Died 3d 5h before this was sent" is the fact that decides
+  // the row — an army annihilated AFTER the launch was still alive to be
+  // inside it, so the direction is spelled out too. Under 7 days the hours
+  // are kept (a 2-day-old death vs a 2.9-day-old one is a different story
+  // for recruiting); from 7 days on whole days suffice. `deadT` is ms (DB
+  // convention, see riAge), the attack's sent times are unix seconds.
+  function gapTxt(seconds) {
+    var s = Math.max(0, Math.round(seconds));
+    if (s < 3600) return Math.max(1, Math.floor(s / 60)) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    var d = Math.floor(s / 86400);
+    if (d >= 7) return d + "d";
+    var h = Math.floor((s % 86400) / 3600);
+    return h ? d + "d " + h + "h" : d + "d";
+  }
+  function deadVsSentTxt(deadT, a) {
+    var t = deadT / 1000;
+    if (a.sent != null) {
+      var gap = a.sent - t;
+      if (Math.abs(gap) < 60) return "en el momento del envío";
+      return gapTxt(Math.abs(gap)) + (gap > 0 ? " antes del envío" : " después del envío");
+    }
+    if (a.sentMin != null) {
+      // Only a departure bracket (slowest … fastest unit, see the "range"
+      // rung of the sent ladder): state the bound that holds for EVERY
+      // possible speed, never a single invented number.
+      if (t <= a.sentMin) return "≥ " + gapTxt(a.sentMin - t) + " antes del envío";
+      if (t >= a.sentMax) return "≥ " + gapTxt(t - a.sentMax) + " después del envío";
+      return "en torno al envío (hora de envío estimada)";
+    }
+    // No departure at all (the row already carries the "Sin hora de envío"
+    // flag): the now-relative age is the only honest number left.
+    return "hace " + reportAgeTxt(deadT);
   }
 
   // === report hover card ===================================================
@@ -842,12 +1187,16 @@
     // Biggest army sent regardless of type (sentBig; the old largest-off `sent`
     // is the fallback for records merged before 2026-08-06), + the CATAS line
     // when the village has qualifying catapult strikes on record.
-    var sentShow = v.sentBig || v.sent;
+    // Sent-side slots outlive conquests (they carry the sender pid): show only the
+    // CURRENT owner's armies (riOwnSent, shared reports-intel.js, calc v6.1.3).
+    var own = function (k) { return (typeof riOwnSent === "function") ? riOwnSent(v, k) : v[k]; };
+    var sentShow = own("sentBig") || own("sent");
     if (sentShow) h += rcBlock("Mayor ejército enviado" + rcAgeTag(sentShow.t), sentShow.units);
-    if (v.sentCat) {
+    var ownCat = own("sentCat");
+    if (ownCat) {
       h += '<div class="rc-sec">' + rcRow("Catapultas",
-        '<span class="rc-catas">💥 suele enviar catas — máx ' + v.sentCat.cat +
-        " (" + v.sentCat.n + "×)" + rcAgeTag(v.sentCat.t) + "</span>") + "</div>";
+        '<span class="rc-catas">💥 suele enviar catas — máx ' + ownCat.cat +
+        " (" + ownCat.n + "×)" + rcAgeTag(ownCat.t) + "</span>") + "</div>";
     }
 
     // 💀 dead troops — only while no newer living-troops observation exists.
@@ -856,6 +1205,14 @@
         '<span class="rc-dead">💀 muertas ' + (v.dead.kind === "def"
           ? "(arrasado defendiendo)" : "(ejército aniquilado atacando)") +
         rcAgeTag(v.dead.t) + "</span>") + "</div>";
+    }
+
+    // 🎯 newest REAL attack this village sent — where its army last landed.
+    var ownLast = own("lastReal");
+    if (ownLast) {
+      h += '<div class="rc-sec">' + rcRow("Último real",
+        '<span class="rc-landed">🎯 ' + TW.commas(ownLast.pop) + " pop" +
+        (ownLast.tgt ? " → " + TW.esc(ownLast.tgt) : "") + rcAgeTag(ownLast.t) + "</span>") + "</div>";
     }
 
     // Always all five spied buildings — 0 = unbuilt/destroyed (muted).
@@ -891,14 +1248,17 @@
     var bg = $("reportModalBg");
     if (bg) bg.parentNode.removeChild(bg);
   }
-  function openReportModal(coord) {
+  // `focus` (optional) names the flag that opened the modal: "landed" puts the
+  // proving report (lastRealRep — newest REAL attack this village sent) first.
+  function openReportModal(coord, focus) {
     rcHide();
     closeReportModal();
     var bg = document.createElement("div");
     bg.id = "reportModalBg";
     bg.className = "twrr-modal-bg";
-    bg.innerHTML = '<div class="twrr-modal"><div class="twrr-modal-title"><span>📄 Informes de ' +
-      TW.esc(coord) + '</span><button type="button" class="twrr-modal-close" id="reportModalClose">✕</button></div>' +
+    var title = focus === "landed" ? "🎯 Ataque real en otro pueblo — " + TW.esc(coord)
+      : focus === "dead" ? "💀 Tropas muertas — " + TW.esc(coord) : "📄 Informes de " + TW.esc(coord);
+    bg.innerHTML = '<div class="twrr-modal"><div class="twrr-modal-title"><span>' + title + '</span><button type="button" class="twrr-modal-close" id="reportModalClose">✕</button></div>' +
       '<div id="reportModalBody" class="tz-note">Cargando informe…</div></div>';
     bg.addEventListener("click", function (e) { if (e.target === bg) closeReportModal(); });
     document.body.appendChild(bg);
@@ -908,7 +1268,7 @@
       if (!body) return; // modal already closed
       if (!villages) { body.textContent = "No se pudo cargar la BD de informes completos."; return; }
       var v = villages[coord];
-      if (!v || (!v.rep && !v.sentRep) || typeof TWRR === "undefined") {
+      if (!v || (!v.rep && !v.sentRep && !v.lastRealRep && !v.deadRep) || typeof TWRR === "undefined") {
         body.textContent = "Sin informe completo guardado para este pueblo.";
         return;
       }
@@ -923,13 +1283,28 @@
       var fresh = function (pid) { return curId == null || pid == null || String(pid) === curId; };
       var rep = (v.rep && fresh(v.rep.defenderPlayerId)) ? v.rep : null;
       var sentRep = (v.sentRep && fresh(v.sentRep.attackerPlayerId)) ? v.sentRep : null;
-      var h = "";
-      if (rep) {
-        h += '<div class="twrr-srchead">Último informe sobre este pueblo:</div>' + TWRR.reportHtml(rep);
-      }
-      if (sentRep && !(rep && sentRep.reportId === rep.reportId)) {
-        h += '<div class="twrr-srchead">Mayor ataque enviado por este pueblo:</div>' + TWRR.reportHtml(sentRep);
-      }
+      var lastRealRep = (v.lastRealRep && fresh(v.lastRealRep.attackerPlayerId)) ? v.lastRealRep : null;
+      // deadRep: this village's troops died in it — as defender (its coord on the
+      // defender side) or as attacker; ownership-checked on that side's player.
+      var deadSidePid = v.deadRep ? (((v.deadRep.defenderX + "|" + v.deadRep.defenderY) === coord)
+        ? v.deadRep.defenderPlayerId : v.deadRep.attackerPlayerId) : null;
+      var deadRep = (v.deadRep && fresh(deadSidePid)) ? v.deadRep : null;
+      // Each stored record renders once even when two slots hold the same report.
+      var h = "", shown = {};
+      var add = function (rec, head) {
+        if (!rec || (rec.reportId != null && shown[rec.reportId])) return;
+        if (rec.reportId != null) shown[rec.reportId] = 1;
+        h += '<div class="twrr-srchead">' + head + "</div>" + TWRR.reportHtml(rec);
+      };
+      var landedHead = "🎯 Último ataque real enviado por este pueblo" +
+        (focus === "landed" ? " — la prueba del FAKE" : "") + ":";
+      var deadHead = "💀 El informe en que murieron sus tropas" + (focus === "dead" ? " — la prueba" : "") + ":";
+      if (focus === "landed") add(lastRealRep, landedHead);
+      if (focus === "dead") add(deadRep, deadHead);
+      add(rep, "Último informe sobre este pueblo:");
+      add(sentRep, "Mayor ataque enviado por este pueblo:");
+      if (focus !== "landed") add(lastRealRep, landedHead);
+      if (focus !== "dead") add(deadRep, deadHead);
       if (!h) {
         body.textContent = "Sin informe del dueño actual — el pueblo cambió de dueño y todo se resetea.";
         return;
@@ -1105,7 +1480,11 @@
     var out = [];
     if (row.unknown) out.push("<span class='flag flag-unknown'>Desconocido</span>");
     row.flags.forEach(function (f) {
-      out.push("<span class='flag flag-" + f.cls + "'>" + TW.esc(f.text) + "</span>");
+      // A flag with `rc` is backed by a stored report: rendered clickable
+      // (delegated click on .flag-link[data-rc]) → report modal focused on it.
+      var link = f.rc ? " flag-link' data-rc='" + TW.esc(f.rc) + "' data-focus='" + f.cls +
+        "' role='button' title='Ver el informe que lo demuestra" : "";
+      out.push("<span class='flag flag-" + f.cls + link + "'>" + TW.esc(f.text) + "</span>");
     });
     if (!out.length) out.push("<span class='flag flag-ok'>Sin señales</span>");
     return out.join(" ");
@@ -1158,9 +1537,10 @@
     // report check; reportFactsOf already applies the conquest cutoff).
     if (!(rt && rt.stale)) {
       var fvC = reportFactsOf(row.coord.key);
-      if (fvC && fvC.sentCat) {
+      var fvCat = fvC && ((typeof riOwnSent === "function") ? riOwnSent(fvC, "sentCat") : fvC.sentCat);
+      if (fvCat) {
         html += " <span class='note-badge note-catas' data-rc='" + row.coord.key + "'>💥CATAS · " +
-          reportAgeTxt(fvC.sentCat.t) + "</span>";
+          reportAgeTxt(fvCat.t) + "</span>";
       }
     }
     if (row.attack && row.attack.dupTotal > 1) {
@@ -1204,6 +1584,7 @@
   // the row, count as "marcado", or survive the «Solo marcados» filter.
   var ALERT_FLAGS = {
     low: 1, "new": 1, after: 1, maybe: 1, stale: 1, nosent: 1, esquivar: 1, nuke: 1, notedef: 1, catas: 1, dead: 1,
+    landed: 1,
   };
   function isAlert(r) {
     if (r.unknown) return true;
@@ -1212,7 +1593,7 @@
   }
 
   var SEVERITY = {
-    nuke: 8, esquivar: 7, dead: 6.9, catas: 6.8, notedef: 6.5, after: 6, "new": 5, maybe: 4, low: 3,
+    landed: 8.5, nuke: 8, esquivar: 7, dead: 6.9, catas: 6.8, notedef: 6.5, after: 6, "new": 5, maybe: 4, low: 3,
     nosent: 2, stale: 2, unknown: 1, media: 0.5, blindado: 0,
   };
   var SORTERS = {
@@ -1643,6 +2024,7 @@
       Object.keys(seen).forEach(function (c) { flagCounts[c] = (flagCounts[c] || 0) + 1; });
     });
     var FLAG_LABELS = {
+      landed: "Ataque real en otro pueblo (🎯)",
       nuke: "Posible nuke/tren real", esquivar: "Esquivar", dead: "Tropas muertas (💀)", catas: "Catas (💥)",
       notedef: "Fake probable (pueblo DEF/vacío)", after: "Conquistado tras el envío",
       "new": "Conquista reciente", maybe: "Posible conquista reciente", low: "Pocos puntos",
@@ -1671,7 +2053,12 @@
       // always exist here even when no file is loaded yet.
       '<div class="fflags" id="fOrders" hidden></div>' +
       '<div class="filter-actions"><button type="button" id="fApply">Aplicar filtros</button>' +
-      '<button type="button" id="fReset">Quitar filtros</button></div>';
+      '<button type="button" id="fReset">Quitar filtros</button>' +
+      // Ids come from the .json de órdenes — the button only exists where that feature does.
+      (ordersFeatureEnabled()
+        ? '<button type="button" id="fCopyIds" title="Copia los IDs (según el .json de órdenes) de los ataques que pasan los filtros aplicados — para «Script ignorar fakes» o cualquier otro uso">Copiar IDs ataques filtrados</button>'
+        : "") +
+      '</div><div id="fCopyNote" class="tz-note" hidden></div>';
 
     function checkedVals(sel) {
       var out = [];
@@ -1688,6 +2075,7 @@
       };
       render();
     });
+    if ($("fCopyIds")) $("fCopyIds").addEventListener("click", onCopyFilteredIds);
     $("fReset").addEventListener("click", function () {
       ["fPlayer", "fType", "fOrigin", "fDest"].forEach(function (id) { $(id).value = ""; });
       $("fFrom").value = from; $("fTo").value = to;
@@ -1708,7 +2096,7 @@
   // === summary / warnings ==================================================
   function summarize() {
     var total = state.rows.length, flagged = 0, unknown = 0;
-    var n = { low: 0, "new": 0, after: 0, maybe: 0, stale: 0, nosent: 0, blindado: 0, esquivar: 0, media: 0, nuke: 0, notedef: 0, catas: 0, dead: 0 };
+    var n = { low: 0, "new": 0, after: 0, maybe: 0, stale: 0, nosent: 0, blindado: 0, esquivar: 0, media: 0, nuke: 0, notedef: 0, catas: 0, dead: 0, landed: 0 };
     for (var i = 0; i < total; i++) {
       var r = state.rows[i];
       if (r.unknown) { unknown++; continue; }
@@ -1738,6 +2126,7 @@
     if (n.after) parts.push(n.after + " conquistad" + (state.mode === "attacks" ? "o" : "a") +
       (n.after === 1 ? "" : "s") + " tras el envío");
     if (n.notedef) parts.push(n.notedef + " desde pueblo DEF/vacío");
+    if (n.landed) parts.push(n.landed + " con su ataque real ya en otro pueblo");
     if (n.dead) parts.push(n.dead + " con tropas muertas");
     if (n.catas) parts.push(n.catas + " de lanzadores de catas");
     if (n.nuke) parts.push(n.nuke + " posible" + (n.nuke === 1 ? "" : "s") + " real" + (n.nuke === 1 ? "" : "es"));
@@ -1936,13 +2325,40 @@
           // whole real army annihilated; a dead 1-ram fake never qualifies —
           // the merge applies the pop floor). Any NEWER living-troops
           // observation retracts it; facts stay pure, the comparison is here.
+          // The age is battle time vs THIS command's departure (deadVsSentTxt).
           var deadInfo = (fvA && fvA.dead && (!fvA.alive || fvA.dead.t >= fvA.alive.t)) ? fvA.dead : null;
           if (deadInfo) {
             row.flags.push({
               cls: "dead",
+              rc: a.origin.key, // clickable → the report of the death (deadRep)
               text: "💀 Tropas muertas " + (deadInfo.kind === "def"
                 ? "(arrasado defendiendo)" : "(su ejército aniquilado atacando)") +
-                " — hace " + reportAgeTxt(deadInfo.t),
+                " — " + deadVsSentTxt(deadInfo.t, a),
+            });
+          }
+          // 🎯 Ataque real en otro pueblo (2026-09-06): the newest REAL attack
+          // this village sent (`lastReal`, farm pop ≥ 5000 — reports-intel)
+          // LANDED somewhere else at t, and t falls between this command's
+          // departure and its arrival. One village fields one real army: if
+          // it hit someone else after this command left, this command cannot
+          // be it → FAKE, proven by a report. The flag carries `rc` so it
+          // renders clickable and opens that report (openReportModal focus).
+          // Departure = exact `sent`, or the LATEST possible one when only a
+          // bracket is known (landing after even the latest departure is
+          // still proof); no departure at all → no flag. fvA is already
+          // conquest-cut and never stale.
+          var dep = a.sent != null ? a.sent : (a.sentMin != null ? a.sentMax : null);
+          var landedT = (fvA && fvA.lastReal) ? fvA.lastReal.t / 1000 : null;
+          var landed = (landedT != null && dep != null && landedT > dep &&
+            (a.arrival == null || landedT < a.arrival)) ? fvA.lastReal : null;
+          if (landed) {
+            row.flags.push({
+              cls: "landed",
+              rc: a.origin.key,
+              text: "🎯 Ataque real en otro pueblo — FAKE: " + TW.commas(landed.pop) + " pop" +
+                (landed.tgt ? " sobre " + landed.tgt : "") + " hace " + reportAgeTxt(landed.t) +
+                ", " + gapTxt(landedT - dep) + " después del envío" +
+                (a.sent == null ? " más tardío posible" : "") + " · ver informe",
             });
           }
           // notedef is SUPPRESSED by catas: "fake probable" and "known cata
@@ -1956,9 +2372,10 @@
             });
           }
           // Dead troops count as a fake signal: a village whose army just
-          // died can't be sending the real thing (suppresses the nuke flag).
+          // died can't be sending the real thing (suppresses the nuke flag);
+          // so does its real army having landed elsewhere after the launch.
           var looksFake = row.flags.some(function (f) {
-            return f.cls === "low" || f.cls === "new" || f.cls === "notedef" || f.cls === "dead";
+            return f.cls === "low" || f.cls === "new" || f.cls === "notedef" || f.cls === "dead" || f.cls === "landed";
           });
           var heavy = a.speed && a.speed.isHeavy;
           var armoured = a.target && a.target.status === "blindado";
@@ -2066,42 +2483,58 @@
       matchOrders();   // a loaded .json survives Limpiar — back to "se emparejarán"
       $("coords").focus();
     });
-    // «.json Órdenes» — optional incoming_orders*.json upload. The file never
-    // leaves the browser; parse errors report themselves in the note line.
-    // Sites without the feature (ordersFeatureEnabled false) hide its UI here
-    // instead of editing the HTML, so the markup stays shared too.
+    // «.json Órdenes» — optional incoming_orders*.json upload, one file or
+    // several chosen together (exports come in batches; they merge into one
+    // command set, see buildOrders). A later choice replaces the whole set.
+    // Files never leave the browser; parse errors report themselves in the
+    // note line. Sites without the feature (ordersFeatureEnabled false) hide
+    // its UI here instead of editing the HTML, so the markup stays shared too.
     if (!ordersFeatureEnabled()) {
-      ["ordersBtn", "ordersFile", "ordersNote", "ordersHelp"].forEach(function (id) {
+      ["ordersBtn", "ordersFile", "ordersNote", "ordersHelp", "ignoreBtn", "ignoreScript", "ignoreNote"].forEach(function (id) {
         var el = $(id);
         if (el) el.hidden = true;
       });
     }
+    function readFileText(f) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(new Error("no se pudo leer el archivo")); };
+        reader.readAsText(f);
+      });
+    }
     $("ordersBtn").addEventListener("click", function () { $("ordersFile").click(); });
     $("ordersFile").addEventListener("change", function () {
-      var f = this.files && this.files[0];
+      var files = this.files ? [].slice.call(this.files) : [];
       this.value = "";   // re-choosing the same file must fire change again
-      if (!f) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        try {
-          state.orders = parseOrders(JSON.parse(reader.result));
-          state.orders.file = f.name;
-          matchOrders();
-          if (state.rows.length) render();
-        } catch (e) {
-          // A bad file must not wipe a good one already loaded — report and keep.
-          var el = $("ordersNote");
-          el.textContent = "No se pudo leer el .json de órdenes: " + (e && e.message ? e.message : e);
-          el.hidden = false;
-        }
-      };
-      reader.onerror = function () {
+      if (!files.length) return;
+      Promise.all(files.map(function (f) {
+        return readFileText(f)
+          .then(function (text) { return { name: f.name, parsed: parseOrders(JSON.parse(text)) }; })
+          .catch(function (e) { return { name: f.name, error: (e && e.message ? e.message : String(e)) }; });
+      })).then(function (results) {
+        var good = results.filter(function (r) { return r.parsed; });
+        var bad = results.filter(function (r) { return r.error; });
         var el = $("ordersNote");
-        el.textContent = "No se pudo leer el archivo .json de órdenes.";
-        el.hidden = false;
-      };
-      reader.readAsText(f);
+        if (!good.length) {
+          // Nothing readable must not wipe a good set already loaded — report and keep.
+          el.textContent = "No se pudo leer " + (files.length > 1 ? "ningún .json de órdenes: " : "el .json de órdenes: ") +
+            bad.map(function (r) { return (files.length > 1 ? r.name + ": " : "") + r.error; }).join(" · ");
+          el.hidden = false;
+          return;
+        }
+        state.orders = buildOrders(good.map(function (r) { return r.parsed; }));
+        state.orders.files = good.map(function (r) { return r.name; });
+        state.orders.errors = bad.map(function (r) { return r.name + " (" + r.error + ")"; });
+        matchOrders();
+        if (state.rows.length) render();
+      });
     });
+    // «Copiar IDs fakes» copies the id list; «Script ignorar fakes» is the static
+    // bookmarklet (drag = install, click = copy for the quickbar).
+    $("ignoreBtn").addEventListener("click", onIgnoreClick);
+    if ($("ignoreScript")) $("ignoreScript").addEventListener("click", onIgnoreScriptClick);
+    refreshIgnoreBtn();
     $("onlyflagged").addEventListener("change", function () {
       if (state.rows.length) render();
     });
@@ -2122,10 +2555,11 @@
       var b = e.target && e.target.closest ? e.target.closest(".note-badge[data-rc]") : null;
       if (b) rcShowFor(b); else rcHide();
     });
-    // 📄 badge click → full report modal (lazy-fetches db-full.json once).
+    // 📄 badge click / 🎯 flag click → full report modal (lazy-fetches
+    // db-full.json once); a flag names the report to put first (data-focus).
     document.addEventListener("click", function (e) {
-      var b = e.target && e.target.closest ? e.target.closest(".note-badge[data-rc]") : null;
-      if (b) openReportModal(b.getAttribute("data-rc"));
+      var b = e.target && e.target.closest ? e.target.closest(".note-badge[data-rc], .flag-link[data-rc]") : null;
+      if (b) openReportModal(b.getAttribute("data-rc"), b.getAttribute("data-focus"));
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") closeReportModal();

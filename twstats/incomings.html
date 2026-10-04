@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>es103 · Entrantes</title>
-  <link rel="stylesheet" href="css/twstats.css?v=20260924.3">
+  <link rel="stylesheet" href="css/twstats.css?v=20261004.1">
 </head>
 <body>
   <div id="main">
@@ -38,10 +38,18 @@
       <span class="flag flag-blindado">Blindado</span> si aguanta de sobra, y
       <span class="flag flag-esquivar">Esquivar</span> si está sin defensa o es un pueblo
       ofensivo (ahí lo que interesa es sacar las tropas). Ambos umbrales se ajustan arriba.
-      <span id="ordersHelp"><br><b>Opcional:</b> con «.json Órdenes» puedes subir el
-      <code>incoming_orders*.json</code> del script exportador de órdenes — cada ataque
+      <span id="ordersHelp"><br><b>Opcional:</b> con «.json Órdenes» puedes subir uno o varios
+      <code>incoming_orders*.json</code> del script exportador de órdenes (elígelos juntos: se combinan
+      en un solo conjunto) — cada ataque
       que coincida (objetivo + origen + hora de llegada exacta) muestra además las
-      <b>unidades reales</b> del comando y su <b>tamaño</b> (el icono del juego).</span>
+      <b>unidades reales</b> del comando y su <b>tamaño</b> (el icono del juego); si lleva catapultas, el
+      <b>edificio objetivo</b> entre paréntesis junto a ellas (exportador v2.1 o posterior). Para ignorarlos de un golpe:
+      instala una sola vez «Script ignorar fakes» (arrástralo a la barra de marcadores o cópialo en la barra
+      rápida del juego); después, en cada análisis, «Copiar IDs fakes» copia los IDs de los ataques confirmados
+      como fake (≤ 2 unidades, sin noble) — en el juego, en Resumen → Entrantes, ejecuta el script, pega los IDs
+      y pulsa «Seleccionar» (quedan marcados para el botón Ignorar del juego) o «Seleccionar y renombrar»
+      (además les pone el nombre que escribas, uno a uno con el lápiz del juego). El script recuerda la última lista
+      y el nombre, así que en una lista paginada basta con volver a ejecutarlo y pulsar.</span>
     </div>
 
     <form class="conquer-filters" id="filters" onsubmit="return false">
@@ -83,9 +91,13 @@
           <button type="button" id="analyze" class="seg">Analizar</button>
           <button type="button" id="clear" class="seg">Limpiar</button>
           <button type="button" id="ordersBtn" class="seg"
-            title="Opcional: sube el incoming_orders*.json del exportador de órdenes para ver las unidades reales de cada ataque emparejado">.json Órdenes</button>
+            title="Opcional: sube uno o varios incoming_orders*.json del exportador de órdenes (se combinan) para ver las unidades reales de cada ataque emparejado">.json Órdenes</button>
+          <button type="button" id="ignoreBtn" class="seg" disabled
+            title="Se activa cuando algún ataque emparejado con el .json tiene ≤ 2 unidades y ningún noble.">Copiar IDs fakes</button>
+          <a id="ignoreScript" class="seg" href="#" draggable="true"
+            title="Script para el juego (se instala una sola vez): arrástralo a la barra de marcadores del navegador, o haz clic para copiarlo y pégalo como enlace en la barra rápida del juego. En Resumen → Entrantes te pide los IDs y los selecciona (o los selecciona y renombra).">Script ignorar fakes</a>
         </div>
-        <input type="file" id="ordersFile" accept=".json,application/json" hidden>
+        <input type="file" id="ordersFile" multiple accept=".json,application/json" hidden>
       </div>
     </form>
 
@@ -94,6 +106,7 @@
     <p class="meta-line" id="summary" hidden>—</p>
     <p class="tz-note" id="modeNote" hidden>—</p>
     <p class="tz-note" id="ordersNote" hidden>—</p>
+    <p class="tz-note" id="ignoreNote" hidden>—</p>
     <p class="status" id="warnLine" hidden>—</p>
 
     <div id="panels" hidden>
@@ -136,11 +149,11 @@
        predates TW.srvEpoch broke this page outright) or a stale stylesheet that
        lacks the newer badge styles. Bump ?v= on EVERY asset change, site-wide;
        the token is shared by all twstats pages. -->
-  <script src="js/common.js?v=20260924.3"></script>
+  <script src="js/common.js?v=20261004.1"></script>
   <!-- The calculator's pure reports-intel module (riClassify/riStale/riAge) —
        the SAME file tribe-calculator ships, so twstats verdicts can't drift. -->
-  <script src="../js/reports-intel.js?v=20260924.3"></script>
-  <script src="../js/report-render.js?v=20260924.3"></script>
-  <script src="js/incomings.js?v=20260924.3"></script>
+  <script src="../js/reports-intel.js?v=20261004.1"></script>
+  <script src="../js/report-render.js?v=20261004.1"></script>
+  <script src="js/incomings.js?v=20261004.1"></script>
 </body>
 </html>

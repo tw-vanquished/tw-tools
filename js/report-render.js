@@ -132,7 +132,12 @@
     var c = (x != null && y != null) ? " (" + x + "|" + y + ")" : "";
     return esc(name || "—") + c + ((x != null && y != null) ? " " + cont(x, y) : "");
   }
-  function cont(x, y) { return "K" + (Math.floor(y / 100) * 10 + Math.floor(x / 100)); }
+  // Continent label, e.g. (523|487) → "K45" — always two digits like the game ("K05", not
+  // "K5"). THE one continent helper: the calculator's map (continentOf) calls TWRR.continent.
+  function cont(x, y) {
+    var k = Math.floor(y / 100) * 10 + Math.floor(x / 100);
+    return "K" + (k < 10 ? "0" : "") + k;
+  }
 
   // One in-game troop table: icon header + Cantidad row (+ Pérdidas when the
   // side fought). `units`/`losses` are cleaned maps (zeros absent).
@@ -266,5 +271,6 @@
   (typeof globalThis !== "undefined" ? globalThis : window).TWRR = {
     reportHtml: reportHtml, subjectLine: subjectLine, fmtT: fmtT,
     travelTimes: travelTimes, setSpeeds: setSpeeds, setIconBase: setIconBase,
+    continent: cont,
   };
 })();

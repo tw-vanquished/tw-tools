@@ -125,12 +125,14 @@ a:hover, a:active { color: var(--link-hover); text-decoration: none; }
 .conquer-filters input[type="number"] { width: 90px; }
 .conquer-filters .grow { flex: 1 1 220px; }
 .conquer-filters .grow input { width: 100%; }
-button, input[type="submit"] {
+button, input[type="submit"], a.seg {
   padding: 5px 12px; border: 1px solid var(--border-light); border-radius: 3px;
   background: var(--btn-gradient); color: var(--text-primary);
   font-family: Verdana, Arial, sans-serif; font-size: 12px; font-weight: 700; cursor: pointer;
 }
-button:hover, input[type="submit"]:hover { background: var(--btn-gradient-hover); border-color: var(--border-dark); }
+button:hover, input[type="submit"]:hover, a.seg:hover { background: var(--btn-gradient-hover); border-color: var(--border-dark); }
+/* a.seg = a bookmarklet link styled as its neighbouring buttons (drag to install, click to copy) */
+a.seg, a.seg:link, a.seg:visited, a.seg:hover { color: var(--text-primary); text-decoration: none; display: inline-block; line-height: normal; box-sizing: border-box; }
 button:disabled { opacity: .45; cursor: default; }
 .scope { display: inline-flex; }
 .scope .seg { border-radius: 0; }
@@ -430,6 +432,11 @@ table.vis.own-villages td.zero { color: var(--text-muted); opacity: .5; }
 .flag-catas { color: #fff; background: #6d3f8e; border-color: #6d3f8e; }
 /* Troops confirmed dead in battle (💀) — dark blood-red, distinct from nuke's red. */
 .flag-dead { color: #fff; background: #7a1f1f; border-color: #7a1f1f; }
+/* 🎯 Its real army already landed elsewhere after this command left — proof-grade fake (teal). */
+.flag-landed { color: #fff; background: #0b6e4f; border-color: #0b6e4f; }
+/* A flag backed by a stored report: clickable → report modal. */
+.flag-link { cursor: pointer; text-decoration: underline dotted; }
+.rc-landed { color: #0b6e4f; font-weight: 700; }
 /* Bonus-village icon (barracks/stable/workshop/farm), inline after the name. */
 .bonus-ic { width: 14px; height: 14px; vertical-align: -2px; }
 .note-badge {
@@ -465,6 +472,7 @@ table.vis th.col-verdict { white-space: normal; }
 .ord-unit { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; white-space: nowrap; }
 .ord-ic { width: 15px; height: 15px; vertical-align: middle; }
 .ord-size { width: 14px; height: 14px; }
+.ord-bld { opacity: .8; white-space: nowrap; }
 
 /* CATAS village tag — purple, sits next to the 📄OFF/DEF badge. */
 .note-catas { color: #fff; background: #6d3f8e; border-color: #6d3f8e; }
