@@ -355,6 +355,8 @@ function normalizeReqs(reqs, villages) {
         out.srcCoord = srcCoord;
         const v = byCoord[srcCoord];
         out.srcVillageId = v ? (v.villageId || '') : (r.srcVillageId || '');
+        // the sitted account's id from the plan import (v1.11.2) — no editor field, kept as is
+        if (/^\d+$/.test(String(r.srcT || ''))) out.srcT = String(r.srcT);
       }
       return out;
     });

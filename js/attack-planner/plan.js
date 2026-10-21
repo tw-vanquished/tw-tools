@@ -119,6 +119,9 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
       DATA.villages.push(v);
       vs[v.id] = { noblesLeft: v.nobles || 0, catsLeft: v.cats || 0, usedForOff: false, fakeCount: 0 };
     }
+    // The plan says this sender is a sitted account (tribe-calculator's t=, v1.11.2): its links
+    // need that id. Only fills a gap — a t from the Mass Recruit import (the session itself) wins.
+    if (!v.t && /^\d+$/.test(String(req.srcT || ''))) v.t = String(req.srcT);
     return v;
   }
 

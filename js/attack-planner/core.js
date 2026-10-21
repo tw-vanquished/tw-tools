@@ -107,7 +107,10 @@ function computeAttackRow(atk) {
 }
 
 function buildAttackUrl(server, fromVillageId, targetVillageId, type, village, nobleCount, dividedOff = false, catCount = 0) {
-  const base = `https://${server}/game.php?village=${fromVillageId}&screen=place&target=${targetVillageId}&attack=true`;
+  // A village imported in sitter mode carries the sat account's id: without t= the game opens
+  // the rally point as your own account. First, as in the game's own links.
+  const sit  = village && village.t ? `t=${village.t}&` : '';
+  const base = `https://${server}/game.php?${sit}village=${fromVillageId}&screen=place&target=${targetVillageId}&attack=true`;
   if (type === 'fake') {
     return `${base}&spy=1&ram=1`;
   }

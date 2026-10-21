@@ -706,7 +706,7 @@ function bindSettings() {
 // VILLAGE IMPORT (bookmarklet + paste)
 // ══════════════════════════════════════════════
 
-const ATTACK_BOOKMARKLET = `(function(){var tbodies=document.querySelectorAll('tbody.row_marker');if(!tbodies.length){alert('No villages found. Make sure you are on the Mass Recruit page (Overview Villages \u2192 Recruit).');return;}var villages=[];tbodies.forEach(function(tbody){var anyInp=tbody.querySelector('input[name^="units["]');if(!anyInp)return;var m=anyInp.name.match(/units\\[(\\d+)\\]/);if(!m)return;var vid=m[1];var link=tbody.querySelector('td a');if(!link)return;var txt=link.textContent.trim();var cm=txt.match(/\\((\\d+)\\|(\\d+)\\)/);if(!cm)return;var name=txt.replace(/\\s*\\(.*/,'').trim();function get(unit){var inp=tbody.querySelector('input[name="units['+vid+']['+unit+']"]');return inp?parseInt(inp.getAttribute('data-existing'))||0:0;}villages.push({id:vid,name:name,x:parseInt(cm[1]),y:parseInt(cm[2]),axes:get('axe'),lc:get('light'),rams:get('ram'),cats:get('catapult'),nobles:get('snob')});});if(!villages.length){alert('Could not parse any village data.');return;}var json=JSON.stringify({server:location.hostname,villages:villages},null,2);navigator.clipboard.writeText(json).then(function(){alert('Copied '+villages.length+' villages to clipboard! Go paste it in the Attack Planner.');}).catch(function(){alert('Could not copy to clipboard. Try Chrome or Edge.');});})();`;
+const ATTACK_BOOKMARKLET = `(function(){var tbodies=document.querySelectorAll('tbody.row_marker');if(!tbodies.length){alert('No villages found. Make sure you are on the Mass Recruit page (Overview Villages \u2192 Recruit).');return;}var villages=[];tbodies.forEach(function(tbody){var anyInp=tbody.querySelector('input[name^="units["]');if(!anyInp)return;var m=anyInp.name.match(/units\\[(\\d+)\\]/);if(!m)return;var vid=m[1];var link=tbody.querySelector('td a');if(!link)return;var txt=link.textContent.trim();var cm=txt.match(/\\((\\d+)\\|(\\d+)\\)/);if(!cm)return;var name=txt.replace(/\\s*\\(.*/,'').trim();function get(unit){var inp=tbody.querySelector('input[name="units['+vid+']['+unit+']"]');return inp?parseInt(inp.getAttribute('data-existing'))||0:0;}villages.push({id:vid,name:name,x:parseInt(cm[1]),y:parseInt(cm[2]),axes:get('axe'),lc:get('light'),rams:get('ram'),cats:get('catapult'),nobles:get('snob')});});if(!villages.length){alert('Could not parse any village data.');return;}var t=(/[?&]t=(\\d+)/.exec(location.search)||[])[1]||'';try{if(!t&&window.game_data&&parseInt(game_data.player.sitter)>0)t=String(game_data.player.id);}catch(e){}var out={server:location.hostname,villages:villages};if(t)out.t=t;var json=JSON.stringify(out,null,2);var more=!/[?&]page=-1/.test(location.search)&&document.querySelector('a.paged-nav-item[href*="page=-1"]')?'\\n\\nOnly the villages on this page were copied. To get all of them, open the list\\'s [all] page ([todos] on .es) and click the bookmark again.':'';navigator.clipboard.writeText(json).then(function(){alert('Copied '+villages.length+' villages to clipboard! Go paste it in the Attack Planner.'+more);}).catch(function(){alert('Could not copy to clipboard. Try Chrome or Edge.');});})();`;
 
 function initBookmarklet() {
   const link = document.getElementById('bm-link');
@@ -750,6 +750,9 @@ function processVillagesJSON(text) {
       const inp = document.getElementById('server-url');
       if (inp) inp.value = parsed.server;
     }
+    // Copied in sitter mode: the sat account's player id (the game's t=), which every link to
+    // its villages needs or the game opens them as your own account. Absent for own villages.
+    const sitT = /^\d+$/.test(String(parsed.t || '')) ? String(parsed.t) : '';
     let added = 0, updated = 0;
     parsed.villages.forEach(pv => {
       const existing = DATA.villages.find(v =>
@@ -762,6 +765,7 @@ function processVillagesJSON(text) {
         if (pv.rams   !== undefined) existing.rams   = pv.rams   || 0;
         if (pv.cats   !== undefined) existing.cats   = pv.cats   || 0;
         if (pv.nobles !== undefined) existing.nobles = pv.nobles || 0;
+        if (sitT) existing.t = sitT; else delete existing.t;
         updated++;
       } else {
         DATA.villages.push({
@@ -775,6 +779,7 @@ function processVillagesJSON(text) {
           rams:       pv.rams   || 0,
           cats:       pv.cats   || 0,
           nobles:     pv.nobles || 0,
+          ...(sitT ? { t: sitT } : {}),
         });
         added++;
       }
@@ -814,11 +819,14 @@ function parseRecruitHTML(htmlText) {
     if (!idMatch) return;
     const villageId = idMatch[1];
     if (seen.has(villageId)) return;
-    seen.add(villageId);
 
+    // Only the row link has coords: the menu's overview_villages links carry the current
+    // village's id too, so marking it seen before this check dropped that village's row.
     const text = link.textContent.trim();
     const coordMatch = text.match(/\((\d+)\|(\d+)\)/);
     if (!coordMatch) return;
+    seen.add(villageId);
+    const tMatch = href.match(/[?&]t=(\d+)/);   // saved in sitter mode: the sat account's id
 
     const getUnit = unit => {
       const inp = doc.querySelector(`input[name="units[${villageId}][${unit}]"]`);
@@ -835,6 +843,7 @@ function parseRecruitHTML(htmlText) {
       rams:   getUnit('ram'),
       cats:   getUnit('catapult'),
       nobles: getUnit('snob'),
+      t:      tMatch ? tMatch[1] : '',
     });
   });
 
@@ -864,6 +873,7 @@ function importFromRecruitHTML(event) {
         existing.rams   = pv.rams;
         existing.cats   = pv.cats;
         existing.nobles = pv.nobles;
+        if (pv.t) existing.t = pv.t; else delete existing.t;
         updated++;
       } else {
         DATA.villages.push({
@@ -877,6 +887,7 @@ function importFromRecruitHTML(event) {
           rams:      pv.rams,
           cats:      pv.cats,
           nobles:    pv.nobles,
+          ...(pv.t ? { t: pv.t } : {}),
         });
         added++;
       }

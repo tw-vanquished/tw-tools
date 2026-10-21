@@ -244,13 +244,17 @@ function parsePlayerPlanBB(text) {
     const timeFrom = rec.timeFrom;                         // captured from the attack line in pass 1
     const timeTo   = rec.timeTo;
 
-    let srcVid = '', tgtVid = '';                                    // village IDs from rally URL
+    let srcVid = '', tgtVid = '', srcT = '';                         // village IDs from rally URL
     const um = line.match(/\[url=([^\]]+)\]/);
     if (um) {
       const vM = um[1].match(/[?&]village=(\d+)/);
       const tM = um[1].match(/[?&]target=(\d+)/);
+      // tribe-calculator ≥ v6.3.1: a sitted player's rally URL carries their account id (t=,
+      // the game's sitter parameter) — Auto-Generate puts it on the sending village (v1.11.2).
+      const sM = um[1].match(/[?&]t=(\d+)(?:&|$)/);
       srcVid = vM ? vM[1] : '';
       tgtVid = tM ? tM[1] : '';
+      srcT   = sM ? sM[1] : '';
     }
 
     // Merge by rally-URL village ID when present, and ALWAYS by coords too — a URL-less snob
@@ -271,6 +275,7 @@ function parsePlayerPlanBB(text) {
     // arrivalDay (day-of-month or null) is transient: importPlayerPlan resolves it to a real
     // per-requirement dateISO on multi-date pastes and then drops it.
     const req = { unitType, attacker: sender, timeFrom, timeTo, count, srcCoord, srcVillageId: srcVid, arrivalDay: rec.day };
+    if (srcT && srcCoord) req.srcT = srcT;
     // Catapult Mode: an off line's "(→ Building)" objective. Only attack lines carry one
     // (snob order lines never do), and buildingLabelOf's paren-anchored arrow can't match
     // the bare "src → [coord]" arrow or anything on a coalesced launch line.
