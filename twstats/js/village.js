@@ -6,6 +6,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var vid = null;   // current village id (localStorage key prefix)
   var nowUnix = 0;  // "now" for relative times (meta.pulledUnix, else latest t)
+  var arch = null;  // TW.playerArchive() map: archived owners link to their page here
 
   function qid() {
     var m = /[?&]id=([^&]+)/.exec(location.search);
@@ -61,25 +62,33 @@
       { width: 460, height: 220, timeX: true });
   }
 
-  // "Posibles mejoras" cell for a positive delta: a <select> of candidate
-  // (building, level) upgrades, plus a "—" option; the choice persists in
-  // localStorage. No candidates → static "Desconocido"; baseline row → "—".
+  // "Posibles mejoras" cell: a <select> of candidate (building, level)
+  // upgrades, plus a "—" option; the choice persists in localStorage. A points
+  // DROP lists the levels that lose exactly that much (catapults / demolition)
+  // as "Pérdida: X nivel L → L-1", in red. No candidates → static
+  // "Desconocido"; baseline row → "—".
   function mejoraCell(delta, t) {
     if (delta == null) return "<td class='col-mejora'>—</td>";
-    var cands = TW.mejoras(delta);
+    var loss = delta < 0;
+    var cands = TW.mejoras(Math.abs(delta));
     if (!cands.length) return "<td class='col-mejora'><span class='barb'>Desconocido</span></td>";
-    if (cands.length === 1) {
-      return "<td class='col-mejora'>" + TW.esc(cands[0].name + " nivel " + cands[0].level) + "</td>";
+    var labels = cands.map(function (c) {
+      return loss ? "Pérdida: " + c.name + " nivel " + c.level + " → " + (c.level - 1)
+        : c.name + " nivel " + c.level;
+    });
+    var cls = loss ? " delta-down" : "";
+    if (labels.length === 1) {
+      return "<td class='col-mejora'>" + (loss ? "<span class='delta-down'>" + TW.esc(labels[0]) + "</span>"
+        : TW.esc(labels[0])) + "</td>";
     }
     var saved = loadMejora(t);
     var opts = '<option value="">—</option>';
-    for (var i = 0; i < cands.length; i++) {
-      var label = cands[i].name + " nivel " + cands[i].level;
-      var sel = saved === label ? " selected" : "";
-      opts += '<option value="' + TW.esc(label) + '"' + sel + ">" + TW.esc(label) + "</option>";
+    for (var i = 0; i < labels.length; i++) {
+      var sel = saved === labels[i] ? " selected" : "";
+      opts += '<option value="' + TW.esc(labels[i]) + '"' + sel + ">" + TW.esc(labels[i]) + "</option>";
     }
-    return "<td class='col-mejora'><select class='mejora-select' data-t='" + t + "'>" +
-      opts + "</select> <span class='mejora-count'>(" + cands.length + ")</span></td>";
+    return "<td class='col-mejora'><select class='mejora-select" + cls + "' data-t='" + t + "'>" +
+      opts + "</select> <span class='mejora-count'>(" + labels.length + ")</span></td>";
   }
 
   // History rows newest→oldest. Tiempo = gap since the previous (older) change.
@@ -112,8 +121,8 @@
       var r = list[i];
       html += "<tr class='" + (i % 2 ? "r2" : "r1") + "'>" +
         "<td class='col-date'>" + TW.fmtStamp(r.t) + "</td>" +
-        "<td>" + TW.ownerCell(r.newOwner) + "</td>" +
-        "<td>" + TW.ownerCell(r.oldOwner) + "</td></tr>";
+        "<td>" + TW.ownerCell(r.newOwner, arch) + "</td>" +
+        "<td>" + TW.ownerCell(r.oldOwner, arch) + "</td></tr>";
     }
     $("conquestsBody").innerHTML = html ||
       "<tr class='r1'><td colspan='3' class='status'>Sin conquistas registradas.</td></tr>";
@@ -133,9 +142,10 @@
 
     // meta.json gives "now" for relative times; tolerate its absence.
     var meta = TW.loadJSON("meta.json").catch(function () { return null; });
-    Promise.all([TW.loadJSON("villages/" + encodeURIComponent(id) + ".json"), meta])
+    Promise.all([TW.loadJSON("villages/" + encodeURIComponent(id) + ".json"), meta, TW.playerArchive()])
       .then(function (res) {
         var d = res[0], m = res[1];
+        arch = res[2];
         var series = d.series || [];
         nowUnix = (m && m.pulledUnix) ? m.pulledUnix
           : (series.length ? series[series.length - 1].t : Math.floor(Date.now() / 1000));

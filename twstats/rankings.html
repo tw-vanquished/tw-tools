@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>es103 · Clasificación</title>
-  <link rel="stylesheet" href="css/twstats.css?v=20261004.1">
+  <link rel="stylesheet" href="css/twstats.css?v=20261022.2">
 </head>
 <body>
   <div id="main">
@@ -25,11 +25,38 @@
         <div class="scope">
           <button type="button" id="modePlayers" class="seg" data-mode="players">Jugadores</button>
           <button type="button" id="modeTribes" class="seg" data-mode="tribes">Tribus</button>
+          <button type="button" id="modeOd" class="seg" data-mode="od" title="Adversarios vencidos (OD)">OD</button>
+          <button type="button" id="modeArchive" class="seg" data-mode="archive" title="Jugadores y tribus que ya no están en el mundo">Archivo</button>
+        </div>
+      </div>
+      <div class="f" id="archWho" hidden>
+        <label>Archivo de</label>
+        <div class="scope">
+          <button type="button" class="seg" data-who="players">Jugadores</button>
+          <button type="button" class="seg" data-who="tribes">Tribus</button>
+        </div>
+      </div>
+      <div class="f" id="odWho" hidden>
+        <label>OD de</label>
+        <div class="scope">
+          <button type="button" class="seg" data-who="players">Jugadores</button>
+          <button type="button" class="seg" data-who="tribes">Tribus</button>
+        </div>
+      </div>
+      <div class="f" id="odKind" hidden>
+        <label>Tipo</label>
+        <div class="scope">
+          <button type="button" class="seg" data-kind="all">Total</button>
+          <button type="button" class="seg" data-kind="att">Atacante</button>
+          <button type="button" class="seg" data-kind="def">Defensor</button>
+          <button type="button" class="seg" data-kind="sup">Apoyo</button>
         </div>
       </div>
     </form>
 
     <p class="tz-note">Todas las horas en hora del servidor (Europe/Madrid). El historial de evolución comienza el 2026-06-11 (inicio del registro). Δ7d = variación de puntos en 7 días. Haz clic en una cabecera para ordenar.</p>
+    <p class="tz-note" id="odNote" hidden>OD = adversarios vencidos. «Rango OD» = posición por ese OD entre los datos archivados (empates comparten puesto); quien no tiene OD de ese tipo va al final con «—».</p>
+    <p class="tz-note" id="archNote" hidden>Archivo = jugadores y tribus que dejaron el mundo (o se borraron) desde el inicio del registro, con su última instantánea; los más recientes primero.</p>
     <p id="status" class="status">Cargando…</p>
 
     <div class="table-wrap">
@@ -48,7 +75,7 @@
     <p class="foot">Datos archivados del mundo es103. No oficial.</p>
   </div>
 
-  <script src="js/common.js?v=20261004.1"></script>
-  <script src="js/rankings.js?v=20261004.1"></script>
+  <script src="js/common.js?v=20261022.2"></script>
+  <script src="js/rankings.js?v=20261022.2"></script>
 </body>
 </html>

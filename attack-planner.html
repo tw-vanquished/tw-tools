@@ -35,6 +35,11 @@
       <label data-i18n="lbl_my_player">My Player</label>
       <input type="text" id="cfg-player" placeholder="Vanquished" style="width:130px">
     </div>
+    <div class="setting-group" data-i18n-title="lbl_alert_title" title="Beep and flash the tab title this many minutes before an unsent attack's send window opens. Empty = off.">
+      <label for="cfg-alert" data-i18n="lbl_alert_min">🔔 Alert (min)</label>
+      <input type="number" id="cfg-alert" min="0" max="180" step="1" data-i18n-placeholder="ph_alert_off" placeholder="off" style="width:62px">
+      <span id="cfg-alert-lock" class="alert-lock" style="display:none" data-i18n="alert_sound_locked">🔇 click the page for sound</span>
+    </div>
   </div>
 </div>
 
@@ -51,13 +56,13 @@
 </div>
 
 <!-- ══════════════════ TABS ══════════════════ -->
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('plan')" data-i18n="tab_attack_plan">⚔ Attack Plan</div>
-  <div class="tab" onclick="switchTab('villages')" data-i18n="tab_my_villages">🏰 My Villages</div>
-  <div class="tab" onclick="switchTab('targets')" data-i18n="tab_targets">🎯 Targets</div>
-  <div class="tab" onclick="switchTab('scavenge')" data-i18n="tab_scavenge">🌾 Scavenging</div>
-  <div class="tab" onclick="switchTab('db')" data-i18n="tab_village_db">🗃 Village DB</div>
-  <div class="tab" onclick="switchTab('guide')" data-i18n="tab_guide">📖 Guide</div>
+<div class="tabs" role="tablist">
+  <div class="tab active" role="tab" tabindex="0" aria-selected="true" onclick="switchTab('plan')" onkeydown="tabKey(event)" data-i18n="tab_attack_plan">⚔ Attack Plan</div>
+  <div class="tab" role="tab" tabindex="0" aria-selected="false" onclick="switchTab('villages')" onkeydown="tabKey(event)" data-i18n="tab_my_villages">🏰 My Villages</div>
+  <div class="tab" role="tab" tabindex="0" aria-selected="false" onclick="switchTab('targets')" onkeydown="tabKey(event)" data-i18n="tab_targets">🎯 Targets</div>
+  <div class="tab" role="tab" tabindex="0" aria-selected="false" onclick="switchTab('scavenge')" onkeydown="tabKey(event)" data-i18n="tab_scavenge">🌾 Scavenging</div>
+  <div class="tab" role="tab" tabindex="0" aria-selected="false" onclick="switchTab('db')" onkeydown="tabKey(event)" data-i18n="tab_village_db">🗃 Village DB</div>
+  <div class="tab" role="tab" tabindex="0" aria-selected="false" onclick="switchTab('guide')" onkeydown="tabKey(event)" data-i18n="tab_guide">📖 Guide</div>
 </div>
 
 <!-- ══════════════════ TAB: ATTACK PLAN ══════════════════ -->
@@ -65,6 +70,9 @@
   <div class="section-header">
     <h2 data-i18n="tab_attack_plan">Attack Plan</h2>
     <div class="section-header-actions">
+      <label class="conflict-filter" id="af-conflicts-wrap" style="display:none" data-i18n-title="conflict_filter_title" title="Villages booked for more than they can send">
+        <input type="checkbox" id="af-conflicts" onchange="renderAttacks()"> <span data-i18n="lbl_conflicts_only">⚠ Conflicts only</span> <span>(<span class="cf-count">0</span>)</span>
+      </label>
       <button class="btn btn-ghost btn-sm" onclick="exportToNotepad()" data-i18n="btn_export_notepad">📋 Export BB Code</button>
       <button class="btn btn-danger btn-sm" onclick="clearAllAttacks()" data-i18n="btn_clear_all">🗑 Clear All</button>
       <button class="btn btn-danger btn-sm" onclick="clearSent()" data-i18n="btn_clear_sent">🗑 Clear Sent</button>
@@ -160,7 +168,7 @@
 <div class="tab-content" id="tab-villages">
   <div class="section-header">
     <h2 data-i18n="tab_my_villages">My Villages</h2>
-    <div style="display:flex;gap:8px">
+    <div class="section-header-actions">
       <button class="btn btn-file btn-sm" onclick="pasteVillages()" data-i18n="btn_paste_villages">📋 Paste Villages</button>
       <button class="btn btn-danger btn-sm" onclick="clearVillages()" data-i18n="btn_clear_villages">🗑 Clear Villages</button>
       <button class="btn btn-primary" onclick="togglePanel('add-village-panel')" data-i18n="btn_add_village">+ Add Village</button>
@@ -168,7 +176,7 @@
   </div>
 
   <div class="bookmarklet-panel">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="bm-columns">
       <div>
         <h4 data-i18n="bm_opt1_title">⚡ Option 1 — Script (automatic)</h4>
         <div class="bookmarklet-row">
@@ -369,7 +377,7 @@
   </div>
 
   <div class="bookmarklet-panel">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="bm-columns">
       <div>
         <h4 data-i18n="bm_opt1_title">⚡ Option 1 — Script (automatic)</h4>
         <div class="bookmarklet-row">
@@ -694,9 +702,16 @@
         <label data-i18n="lbl_village_id">Village ID</label>
         <input type="number" id="mt-vid">
       </div>
-      <div class="form-group" style="grid-column: span 2">
+      <div class="form-group">
         <label data-i18n="lbl_player">Player</label>
         <input type="text" id="mt-player">
+      </div>
+      <div class="form-group">
+        <label data-i18n="lbl_type">Type</label>
+        <select id="mt-type">
+          <option value="off" data-i18n="opt_target_off">Off</option>
+          <option value="fake" data-i18n="opt_target_fake">Fake</option>
+        </select>
       </div>
     </div>
     <div style="margin-top:10px">
@@ -756,6 +771,11 @@
           <div id="ag-divided-off-villages" style="margin-top:6px;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#5a3a18">
             <!-- populated on open -->
           </div>
+          <div style="margin-top:6px;padding-left:18px;font-size:12px;color:#d4b483;display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+            <span data-i18n="ag_escort_label">Escort per noble when the village also sends its own off:</span>
+            <input type="number" id="ag-escort-axe" min="0" step="1" value="0" style="width:70px" onchange="setNobleEscort()"> <span data-i18n="ag_escort_axe">axe</span>
+            <input type="number" id="ag-escort-lc" min="0" step="1" value="0" style="width:70px" onchange="setNobleEscort()"> <span data-i18n="ag_escort_lc">LC</span>
+          </div>
         </div>
       </div>
     </div>
@@ -780,7 +800,7 @@
     <h3 data-i18n="modal_export">📋 Export to Notepad</h3>
     <textarea id="export-text" readonly style="width:100%;height:320px;background:#111008;border:1px solid #4a3010;color:#d4b483;padding:8px;border-radius:4px;font-family:monospace;font-size:11px;resize:vertical"></textarea>
     <div class="modal-actions">
-      <button class="btn btn-primary" onclick="copyExportText()" data-i18n="btn_copy_all">Copy All</button>
+      <button class="btn btn-primary" onclick="copyExportText(this)" data-i18n="btn_copy_all">Copy All</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-export')" data-i18n="btn_close">Close</button>
     </div>
   </div>
@@ -882,7 +902,7 @@
 <script src="js/attack-planner/scavenge.js"></script>
 <script src="js/attack-planner/init.js"></script>
 <div class="footer">
-  Developed by <span>Vanquished</span> &nbsp;·&nbsp; v1.11.2 &nbsp;·&nbsp; 2026-10-21
+  Developed by <span>Vanquished</span> &nbsp;·&nbsp; v1.12.0 &nbsp;·&nbsp; 2026-10-22
 </div>
 </body>
 </html>

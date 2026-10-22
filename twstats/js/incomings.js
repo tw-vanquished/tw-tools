@@ -54,6 +54,7 @@
     byCoord: {},        // "x|y" -> village record {id,name,x,y,points,owner}
     playerIdByName: {}, // attacker name -> player id learned from villages.json (resolvePlayers)
     lastConquer: {},    // village id -> {t, oldOwner, newOwner}
+    conquersById: {},   // village id -> every conquest of it, oldest first
     cfg: null,          // world config (speeds, attack_gap, snob max_dist)
     mode: "coords",     // "coords" | "attacks"
     rows: [],           // last analysis result (all rows)
@@ -253,9 +254,23 @@
   // "[b]<label>:[/b] <numbers>" — wall level, loyalty, or the defender troop row.
   var TARGET_FIELD_RE = /\[b\]([^\[]*)\[\/b\]\s*([\d\s]+)\s*$/i;
 
+  // The same export pasted twice (or a re-export overlapping an earlier one)
+  // would double every command into a false «Tren ×2» and double AS i/n. A
+  // line WITH milliseconds is identified by target + origin + exact arrival —
+  // the identity orderFor uses; labels may differ between exports. Without
+  // milliseconds a same-second train from one village prints identical lines,
+  // so they are deduped PER LINE, never within one block: each time a target's
+  // header appears again, every ms-less line that target already collected
+  // becomes consumable once, and an identical line under the new header
+  // consumes one copy (counted as a duplicate). That is the overlapping
+  // re-export: [X,X] then [X,X,Z] → X,X,Z. The new block is NOT checked to be
+  // a full repeat — so two partial exports of one ms-less same-second train,
+  // each under its own header, fold together too (a multiset-containment rule
+  // would bring the false trains back for re-exports, the common case).
   function parseAttacks(text) {
     var lines = text.split(/\r?\n/), out = [], targets = {}, cur = null;
-    var skipped = [], inconsistent = 0;
+    var skipped = [], inconsistent = 0, duplicates = 0;
+    var seenMs = {}, linesByTarget = {}, earlier = {};
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
 
@@ -271,6 +286,20 @@
         var aMonth = Number(arrM[2]);
         var arrival = TW.srvEpoch(aYear, aMonth, Number(arrM[1]),
           Number(arrM[4]), Number(arrM[5]), Number(arrM[6]));
+        var arrivalMs = arrM[7] ? Number((arrM[7] + "00").slice(0, 3)) : 0;
+
+        var oKey = Number(origin[1]) + "|" + Number(origin[2]);
+        var tKey = cur ? cur.key : "";
+        if (arrM[7]) {
+          var idKey = tKey + ">" + oKey + "@" + arrival + ":" + arrivalMs;
+          if (seenMs[idKey]) { duplicates++; continue; }
+          seenMs[idKey] = true;
+        } else {
+          var txt = line.trim();
+          if (earlier[txt] > 0) { earlier[txt]--; duplicates++; continue; }
+          var own = linesByTarget[tKey] || (linesByTarget[tKey] = {});
+          own[txt] = (own[txt] || 0) + 1;
+        }
 
         var sm = RE_SENT.exec(line), rm = RE_RETURN.exec(line), dm = RE_DURATION.exec(line);
         var sentExplicit = sm ? datedAgainst(sm, aYear, aMonth, -1) : null;
@@ -298,14 +327,15 @@
           label: lm ? lm[1] : "",
           player: playerName || "?",
           playerSource: playerName ? (tm ? "tag" : "label") : null,
-          origin: { key: Number(origin[1]) + "|" + Number(origin[2]), x: Number(origin[1]), y: Number(origin[2]) },
+          origin: { key: oKey, x: Number(origin[1]), y: Number(origin[2]) },
           target: cur,
           sent: sent,
           sentSource: sentSource,
           returnT: retExplicit != null ? retExplicit : (durSec != null ? arrival + durSec : null),
+          returnExplicit: retExplicit != null,   // false → deduced (Backtime shows «≈»)
           durationMin: durSec != null ? durSec / 60 : null,
           arrival: arrival,
-          arrivalMs: arrM[7] ? Number((arrM[7] + "00").slice(0, 3)) : 0,
+          arrivalMs: arrivalMs,
         });
         continue;
       }
@@ -313,6 +343,12 @@
       var t = TARGET_RE.exec(line);
       if (t) {
         var key = Number(t[1]) + "|" + Number(t[2]);
+        // The ms-less lines this target collected so far are what a repeat of
+        // its block may consume (a copy of them, so the new block's own lines
+        // are never matched against each other).
+        var prev = linesByTarget[key] || {};
+        earlier = {};
+        for (var p in prev) earlier[p] = prev[p];
         cur = targets[key] || (targets[key] = {
           key: key, x: Number(t[1]), y: Number(t[2]),
           wall: null, loyalty: null, def: null,
@@ -332,7 +368,8 @@
         else if (cur.loyalty == null) cur.loyalty = nums[0];
       }
     }
-    return { attacks: out, targets: targets, skipped: skipped, inconsistent: inconsistent };
+    return { attacks: out, targets: targets, skipped: skipped, inconsistent: inconsistent,
+             duplicates: duplicates };
   }
 
   // === derived attack facts ================================================
@@ -347,9 +384,9 @@
     attacks.forEach(function (a) {
       var v = state.byCoord[a.origin.key];
       var owner = v && v.owner && v.owner.id != null && v.owner.name ? v.owner : null;
-      var lc = v && state.lastConquer[v.id];
-      if (owner && lc && a.sent != null && lc.t > a.sent && lc.oldOwner && lc.oldOwner.name) {
-        owner = lc.oldOwner; // launched before the conquest → previous owner
+      var lc = v && a.sent != null ? conquestsAround(v.id, a.sent).after : null;
+      if (owner && lc && lc.oldOwner && lc.oldOwner.name) {
+        owner = lc.oldOwner; // launched before the first later conquest → its previous owner
       }
       if (!owner) return;
       if (!a.playerSource) {
@@ -605,6 +642,12 @@
         '.webp" alt="' + c.size + '" title="Ataque ' + ORD_SIZE_ES[c.size] +
         ' (icono del juego)">'
       : "";
+    // Troops not shared with you: the exporter writes every unit as 0, so
+    // "no chips" here means UNKNOWN, never an empty command.
+    if (ordHidden(c)) {
+      chips = ['<span class="ord-unit ord-hidden" title="El .json no trae las tropas de este comando ' +
+        '(no compartidas): se desconocen">tropas ocultas</span>'];
+    }
     if (!chips.length && !size) return "";
     return '<span class="ord-units" title="Unidades según el .json de órdenes' +
       (c.label ? " · " + TW.esc(c.label) : "") + '">' + size + chips.join("") + "</span>";
@@ -626,15 +669,19 @@
     { key: "multi", label: "Más de 2 unidades",
       title: "Más de 2 unidades en total según el .json: no puede ser el fake típico de 1 espía + 1 ariete/catapulta" },
     { key: "unknown", label: "Tropas desconocidas",
-      title: "Sin orden emparejada en el .json: las tropas del comando se desconocen" },
+      title: "Sin orden emparejada en el .json, o emparejada con las tropas ocultas: las tropas del comando se desconocen" },
   ];
   function ordUnitTotal(c) {
     var n = 0;
     for (var u in c.units) n += c.units[u] || 0;
     return n;
   }
+  // The exporter has no field for "troops not shared": it writes every unit as
+  // 0 (incomingOrdersv2-2.js ioBuildJson). A real command always carries at
+  // least one unit, so all-zero units = the army is unknown.
+  function ordHidden(c) { return ordUnitTotal(c) === 0; }
   function ordFilterHit(a, want) {
-    if (want === "unknown") return !a.order;
+    if (want === "unknown") return !a.order || ordHidden(a.order);
     if (!a.order) return false;
     if (want === "multi") return ordUnitTotal(a.order) > 2;
     return a.order.size === want;
@@ -688,6 +735,9 @@
       var o = r.attack && r.attack.order;
       if (!o || o.id == null || o.id === "" || o.contains_snob) return;
       if ((o.units.snob || 0) > 0 || ordUnitTotal(o) > IGNORE_MAX_UNITS) return;
+      // Hidden troops (all zero) are unknown, not a token fake; and the game's
+      // own medium/large size icon contradicts a ≤ 2-unit army — never ignore.
+      if (ordHidden(o) || o.size === "medium" || o.size === "large") return;
       var id = String(o.id);
       if (!/^\d+$/.test(id) || seen[id]) return;   // ids are numeric in-game; never inject text
       seen[id] = true;
@@ -822,8 +872,9 @@
     btn.textContent = "Copiar IDs fakes" + (n ? " (" + n + ")" : "");
     btn.title = n
       ? "Copia los IDs de los " + n + " ataques que el .json confirma como fake (≤ " + IGNORE_MAX_UNITS +
-        " unidades, sin noble). En el juego, en Resumen → Entrantes, ejecuta «Script ignorar fakes», pega los IDs y pulsa «Seleccionar» o «Seleccionar y renombrar»; luego pulsa el botón Ignorar del juego."
-      : "Se activa cuando algún ataque emparejado con el .json tiene ≤ " + IGNORE_MAX_UNITS + " unidades y ningún noble.";
+        " unidades visibles, sin noble y sin icono de ataque mediano/grande). En el juego, en Resumen → Entrantes, ejecuta «Script ignorar fakes», pega los IDs y pulsa «Seleccionar» o «Seleccionar y renombrar»; luego pulsa el botón Ignorar del juego."
+      : "Se activa cuando algún ataque emparejado con el .json tiene ≤ " + IGNORE_MAX_UNITS +
+        " unidades visibles, ningún noble y no lleva icono de ataque mediano/grande.";
     var note = $("ignoreNote");
     if (note && !n) note.hidden = true;
   }
@@ -859,9 +910,12 @@
   // target, a time window…) can feed «Script ignorar fakes» or anything else.
   // Ids exist only for rows matched to the .json de órdenes (the BBCode dump has
   // none); unmatched rows are counted and reported, never invented.
+  // Hidden-troop orders (all units 0, e.g. via «Tropas desconocidas») are
+  // copied too — the user picked the filter — but counted, so the note can say
+  // that those ids may be real attacks.
   function filteredOrderIds() {
-    var seen = {}, ids = [], unmatched = 0;
-    if (state.mode !== "attacks") return { ids: ids, unmatched: 0 };
+    var seen = {}, ids = [], unmatched = 0, hidden = 0;
+    if (state.mode !== "attacks") return { ids: ids, unmatched: 0, hidden: 0 };
     state.rows.forEach(function (r) {
       if (!passesFilters(r)) return;
       var o = r.attack && r.attack.order;
@@ -870,8 +924,9 @@
       if (seen[id]) return;
       seen[id] = true;
       ids.push(id);
+      if (ordHidden(o)) hidden++;
     });
-    return { ids: ids, unmatched: unmatched };
+    return { ids: ids, unmatched: unmatched, hidden: hidden };
   }
   function fCopyNoteShow(msg) {
     var note = $("fCopyNote");
@@ -888,8 +943,10 @@
     var list = res.ids.join(",");
     copyText(list, function () {
       fCopyNoteShow("IDs copiados — " + res.ids.length + " ataque" + (res.ids.length === 1 ? "" : "s") +
-        " que pasan los filtros aplicados" +
+        (res.ids.length === 1 ? " que pasa" : " que pasan") + " los filtros aplicados" +
         (res.unmatched ? " (" + res.unmatched + " más sin ID: no emparejados con el .json)" : "") +
+        (res.hidden ? ". ⚠ " + res.hidden + " con tropas ocultas: " +
+          (res.hidden === 1 ? "puede ser un ataque real" : "pueden ser ataques reales") : "") +
         ". Pégalos en «Script ignorar fakes» o donde los necesites.");
     }, function () {
       fCopyNoteShow("No se pudo copiar automáticamente; copia los IDs a mano: " + list);
@@ -903,7 +960,7 @@
     var list = ids.join(",");
     copyText(list, function () {
       ignoreNoteShow("IDs copiados — " + ids.length + " ataque" + (ids.length === 1 ? "" : "s") +
-        " fake (≤ " + IGNORE_MAX_UNITS + " unidades según el .json). En el juego abre Resumen → Entrantes, " +
+        " fake (≤ " + IGNORE_MAX_UNITS + " unidades visibles según el .json, sin noble ni icono mediano/grande). En el juego abre Resumen → Entrantes, " +
         "ejecuta «Script ignorar fakes» desde la barra rápida, pega los IDs en la ventana y pulsa «Seleccionar» (o «Seleccionar y renombrar»); luego pulsa el botón Ignorar del juego.");
     }, function () {
       // No clipboard (permissions / old browser): show the list so it can be copied by hand.
@@ -980,6 +1037,8 @@
       if (!prev || c.t > prev.t) {
         state.lastConquer[id] = { t: c.t, oldOwner: c.oldOwner, newOwner: c.newOwner };
       }
+      (state.conquersById[id] = state.conquersById[id] || [])
+        .push({ t: c.t, oldOwner: c.oldOwner, newOwner: c.newOwner });
       // Fallback locator: a village missing from villages.json (data lag or
       // deleted) still resolves to an id via its last conquest record.
       if (c.village.x != null && !state.byCoord[c.village.x + "|" + c.village.y]) {
@@ -989,6 +1048,22 @@
         };
       }
     }
+    Object.keys(state.conquersById).forEach(function (k) {
+      state.conquersById[k].sort(function (a, b) { return a.t - b.t; });
+    });
+  }
+
+  // A village can change hands several times around one attack's flight (a
+  // retake on a front): the conquest judged against `t` is not only the
+  // latest. `before` = the last conquest at or before t, `after` = the FIRST
+  // one strictly after it (the one that took the village from the sender).
+  function conquestsAround(id, t) {
+    var list = state.conquersById[id] || [], before = null, after = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].t <= t) before = list[i];
+      else { after = list[i]; break; }
+    }
+    return { before: before, after: after };
   }
 
   // Shared reports DB — degrades gracefully: an unreachable Worker only
@@ -1426,28 +1501,38 @@
 
     if (row.conquer && opts.maxDays > 0) {
       var win = opts.maxDays * 86400;
+      // Judged against EVERY conquest (conquestsAround), not only the latest
+      // one shown in the column: taken shortly before the send and retaken
+      // after it is both "new" and "after".
       function verdict(t) {
-        var age = t - row.conquer.t;
-        return age < 0 ? "after" : (age < win ? "new" : "old");
+        var c = conquestsAround(v.id, t);
+        c.isNew = !!c.before && t - c.before.t < win;
+        c.isAfter = !!c.after;
+        return c;
       }
       if (range) {
         // The sent time is only bracketed, so the two ends can disagree. Say
         // "posible" when they do rather than picking an end and sounding sure.
         var vMin = verdict(range.min), vMax = verdict(range.max);
-        if (vMin === vMax && vMin === "new") {
+        var bothNew = vMin.isNew && vMax.isNew, bothAfter = vMin.isAfter && vMax.isAfter;
+        if (bothNew) {
           row.flags.push({ cls: "new", text: "Conquistado poco antes del envío (estimado por distancia)" });
-        } else if (vMin === vMax && vMin === "after") {
+        }
+        if (bothAfter) {
           row.flags.push({ cls: "after", text: "Conquistado tras el envío (estimado por distancia)" });
-        } else if (vMin !== "old" || vMax !== "old") {
+        }
+        if (!bothNew && (vMin.isNew || vMax.isNew || vMin.isAfter !== vMax.isAfter)) {
           row.flags.push({ cls: "maybe", text: "Posiblemente conquistado poco antes del envío (envío solo estimado)" });
         }
       } else {
-        var age = refT - row.conquer.t;
-        if (age < 0) {
+        var at = verdict(refT);
+        if (at.isAfter) {
           // Conquered after this attack left: the troops in the air belong to
           // the previous owner. Not the same as "recently taken".
-          row.flags.push({ cls: "after", text: "Conquistado tras el envío (" + TW.dur(-age) + " después)" });
-        } else if (age < win) {
+          row.flags.push({ cls: "after", text: "Conquistado tras el envío (" + TW.dur(at.after.t - refT) + " después)" });
+        }
+        if (at.isNew) {
+          var age = refT - at.before.t;
           row.flags.push({
             cls: "new",
             text: state.mode === "attacks"
@@ -1680,10 +1765,66 @@
     }
   }
 
-  function passesFilters(r) {
+  // «Llega en» (2026-10-22): dumps get re-pasted hours later, so each arrival
+  // also says how far off it is against the REAL clock (both are true epochs,
+  // no timezone maths). Not a flag: it never marks a row or counts as alert.
+  function nowSec() { return Date.now() / 1000; }
+  function hasArrived(a, now) {
+    return a.arrival + (a.arrivalMs || 0) / 1000 <= (now == null ? nowSec() : now);
+  }
+  // "en 3h 12m" / "en 2d 4h" / "en 45m" / "ya llegó" (TW.dur drops minutes).
+  function arrivalRelText(a, now) {
+    if (hasArrived(a, now)) return "ya llegó";
+    var s = a.arrival + (a.arrivalMs || 0) / 1000 - (now == null ? nowSec() : now);
+    var m = Math.floor(s / 60), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mi = m % 60;
+    if (d) return "en " + d + "d " + h + "h";
+    if (h) return "en " + h + "h " + mi + "m";
+    return m ? "en " + m + "m" : "en <1m";
+  }
+  // Backtime's "vuelve en 2d 11h" / "ya volvió" — built and ticked from here.
+  function returnRelText(t, now) {
+    return t <= now ? "ya volvió" : arrivalRelText({ arrival: t }, now).replace(/^en /, "vuelve en ");
+  }
+  function arrivedCount() {
+    if (state.mode !== "attacks") return 0;
+    var now = nowSec(), k = 0;
+    state.rows.forEach(function (r) { if (r.attack && hasArrived(r.attack, now)) k++; });
+    return k;
+  }
+  // Every minute: refresh the countdown texts in place (no re-analysis). Only
+  // when a command lands in the meantime are the summary (and, with «Ocultar
+  // ya llegados» on, the table) rebuilt.
+  function tickArrivals() {
+    if (!state.rows.length || state.mode !== "attacks") return;
+    var now = nowSec();
+    var spans = document.querySelectorAll("#rows .arr-rel[data-arr]");
+    for (var i = 0; i < spans.length; i++) {
+      var a = { arrival: +spans[i].getAttribute("data-arr"), arrivalMs: 0 };
+      var done = hasArrived(a, now);
+      spans[i].textContent = arrivalRelText(a, now);
+      spans[i].classList.toggle("arr-done", done);
+    }
+    var rets = document.querySelectorAll("#backtime .arr-rel[data-ret]");
+    for (var j = 0; j < rets.length; j++) {
+      var t = +rets[j].getAttribute("data-ret");
+      rets[j].textContent = returnRelText(t, now);
+      rets[j].classList.toggle("arr-done", t <= now);
+    }
+    var k = arrivedCount();
+    if (k !== state.arrivedN) {
+      summarize();
+      if ($("hidearrived") && $("hidearrived").checked) render();
+      else updateShowing(state.rows.filter(function (r) { return passesFilters(r); }).length);
+    }
+  }
+
+  // keepArrived: the Backtime panel reads the same filters but must keep the
+  // commands that already landed — those are exactly the ones to backtime.
+  function passesFilters(r, keepArrived) {
     if ($("onlyflagged").checked && !isAlert(r)) return false;
     if (state.mode !== "attacks") return true;
     var f = state.filters, a = r.attack;
+    if (keepArrived !== true && $("hidearrived") && $("hidearrived").checked && hasArrived(a)) return false;
     // «Filtros de aviso»: when any flag classes are checked, keep only rows
     // carrying at least one of them (OR semantics; `unknown` is its own class).
     if (f.flags && f.flags.length) {
@@ -1713,12 +1854,12 @@
 
   function render() {
     var grouped = state.mode === "attacks" && $("groupbytarget").checked;
-    var shown = sortRows(state.rows.filter(passesFilters));
+    var shown = sortRows(state.rows.filter(function (r) { return passesFilters(r); }));
     if (grouped) shown = groupRows(shown);
     var cols = HEADS[state.mode].length;
     renderHead();
 
-    var html = "", n = 0, lastTarget = null;
+    var html = "", n = 0, lastTarget = null, nowT = nowSec();
     for (var i = 0; i < shown.length; i++) {
       var r = shown[i];
       var cls = (n % 2 ? "r2" : "r1") + (isAlert(r) ? " row-flagged" : "") + (r.unknown ? " row-unknown" : "");
@@ -1782,7 +1923,10 @@
         }
         timeCell = "<td class='col-date'>" + sentTxt +
           "<br><span class='conq-ago'>→ " + TW.fmtTime(r.attack.arrival) +
-          "." + String(r.attack.arrivalMs).padStart(3, "0") + "</span>" + tr + "</td>";
+          "." + String(r.attack.arrivalMs).padStart(3, "0") + "</span>" + tr +
+          "<br><span class='arr-rel" + (hasArrived(r.attack, nowT) ? " arr-done" : "") +
+          "' data-arr='" + (r.attack.arrival + (r.attack.arrivalMs || 0) / 1000) + "'>" +
+          arrivalRelText(r.attack, nowT) + "</span></td>";
       }
 
       html += "<tr class='" + cls + "'>" +
@@ -1803,6 +1947,7 @@
       "<tr class='r1'><td colspan='" + cols + "' class='status'>Sin resultados.</td></tr>";
     $("tableWrap").hidden = false;
     updateShowing(shown.length);
+    if (state.mode === "attacks") buildBacktime();
   }
 
   function updateShowing(shownCount) {
@@ -1927,6 +2072,74 @@
     $("combos").innerHTML =
       tbl("Pueblo de origen (" + origins.length + ")", origins, true) +
       tbl("Pueblo objetivo (" + dests.length + ")", dests, true);
+  }
+
+  // «Backtime» (2026-10-22): the rows flagged «⚠ Posible nuke real» (known
+  // origins only, like the summary's «posibles reales»), sorted by the time
+  // their army gets home — when your own attack on that village should land.
+  // Rebuilt by render(), so it follows the applied filters; «Ocultar ya
+  // llegados» does NOT apply here (a landed nuke is exactly the one to backtime).
+  // A return the dump did not state (deduced from duration/arrival) shows «≈».
+  function backtimeRows() {
+    if (state.mode !== "attacks") return [];
+    return state.rows.filter(function (r) {
+      return !r.unknown && r.attack && passesFilters(r, true) &&
+        r.flags.some(function (f) { return f.cls === "nuke"; });
+    }).sort(function (x, y) {
+      var a = x.attack.returnT, b = y.attack.returnT;
+      if (a == null || b == null) return (a == null) - (b == null);
+      return a - b || x.attack.origin.key.localeCompare(y.attack.origin.key);
+    });
+  }
+  function buildBacktime() {
+    var el = $("backtime"), panel = $("panelBacktime");
+    if (!el || !panel) return;
+    var list = backtimeRows(), now = nowSec();
+    panel.querySelector("summary").textContent = "Backtime — posibles nukes reales (" + list.length + ")";
+    if (!list.length) {
+      el.innerHTML = "<p class='tz-note'>Ningún «⚠ Posible nuke real» entre los ataques filtrados.</p>";
+      return;
+    }
+    var bb = [];
+    var body = list.map(function (r, i) {
+      var a = r.attack, v = r.village, tg = a.target, tgv = tg ? state.byCoord[tg.key] : null;
+      var approx = a.returnT != null && !a.returnExplicit;
+      var retTxt = a.returnT == null ? "<span class='barb'>desconocido</span>"
+        : (approx ? "<span class='derived' title='Deducido de la duración (el volcado no trae la hora de regreso)'>≈ "
+          : "<span>") + TW.fmtTime(a.returnT) + "</span>" +
+          "<br><span class='arr-rel" + (a.returnT <= now ? " arr-done" : "") + "' data-ret='" + a.returnT + "'>" +
+          returnRelText(a.returnT, now) + "</span>";
+      var off = r.originNote === "OFF" ? " <span class='flag flag-nuke' title='Informe reciente: pueblo OFF'>OFF</span>" : "";
+      var owner = v && v.owner && v.owner.name ? v.owner.name : (a.player && a.player !== "?" ? a.player : "");
+      bb.push("[coord]" + a.origin.key + "[/coord]" + (owner ? " [player]" + owner + "[/player]" : "") +
+        " regreso " + (a.returnT == null ? "?" : (approx ? "≈ " : "") + TW.fmtTime(a.returnT)) +
+        (tg ? " → [coord]" + tg.key + "[/coord]" : ""));
+      return "<tr class='" + (i % 2 ? "r2" : "r1") + "'>" +
+        "<td class='col-rank'>" + (i + 1) + ".</td>" +
+        "<td>" + TW.villageCell(v) + off + "</td>" +
+        "<td>" + TW.ownerCell(v.owner) + "</td>" +
+        "<td>" + TW.esc(a.speed ? a.speed.label : "?") + "</td>" +
+        "<td class='col-date'>" + retTxt + "</td>" +
+        "<td>" + (tgv ? TW.villageCell(tgv) : tg ? TW.esc(tg.key) : "<span class='barb'>—</span>") + "</td></tr>";
+    }).join("");
+    el.innerHTML = "<div class='table-wrap'><table class='vis widget'><thead><tr>" +
+      "<th class='col-rank'>#</th><th>Pueblo de origen</th><th>Propietario</th><th>Tropa</th>" +
+      "<th class='col-date'>Regreso</th><th>Objetivo</th></tr></thead><tbody>" + body + "</tbody></table></div>" +
+      "<p class='tz-note'>Ordenado por hora de regreso (hora del servidor). Respeta los filtros aplicados.</p>" +
+      "<label class='tz-note' for='backtimeBB'>Coords + regreso (BB-code):</label>" +
+      "<textarea id='backtimeBB' class='coord-dump' rows='4' readonly spellcheck='false'>" + TW.esc(bb.join("\n")) + "</textarea>" +
+      "<div class='scope'><button type='button' id='backtimeCopy' class='seg'>Copiar coords + regreso</button></div>" +
+      "<div id='backtimeNote' class='tz-note' hidden></div>";
+    $("backtimeCopy").addEventListener("click", function () {
+      var text = $("backtimeBB").value, note = $("backtimeNote");
+      copyText(text, function () {
+        note.textContent = "Copiado — " + list.length + " pueblo" + (list.length === 1 ? "" : "s") + " con su hora de regreso.";
+        note.hidden = false;
+      }, function () {
+        note.textContent = "No se pudo copiar automáticamente; selecciona el texto de arriba y cópialo a mano.";
+        note.hidden = false;
+      });
+    });
   }
 
   // Wall / loyalty / troops come from the dump itself — a SNAPSHOT as of export,
@@ -2099,10 +2312,16 @@
     var n = { low: 0, "new": 0, after: 0, maybe: 0, stale: 0, nosent: 0, blindado: 0, esquivar: 0, media: 0, nuke: 0, notedef: 0, catas: 0, dead: 0, landed: 0 };
     for (var i = 0; i < total; i++) {
       var r = state.rows[i];
-      if (r.unknown) { unknown++; continue; }
-      if (isAlert(r)) flagged++;
+      // An unknown origin stays out of «marcados», and only its target-side
+      // flags (the STATUS_TEXT verdicts — Blindado / Esquivar / Defensa media
+      // describe YOUR village) are counted. Its attacker-side badges (e.g. the
+      // nuke one, which no fake signal can veto without world data) stay out.
+      if (r.unknown) unknown++;
+      else if (isAlert(r)) flagged++;
       for (var j = 0; j < r.flags.length; j++) {
-        if (n[r.flags[j].cls] != null) n[r.flags[j].cls]++;
+        var fc = r.flags[j].cls;
+        if (r.unknown && !STATUS_TEXT[fc]) continue;
+        if (n[fc] != null) n[fc]++;
       }
     }
     var parts;
@@ -2116,6 +2335,9 @@
         Object.keys(targets).length + " objetivo" + (Object.keys(targets).length === 1 ? "" : "s"),
         Object.keys(origins).length + " pueblo" + (Object.keys(origins).length === 1 ? "" : "s") + " de origen",
         flagged + " marcado" + (flagged === 1 ? "" : "s")];
+      // Against the real clock (not a flag): how much of the dump is history.
+      state.arrivedN = arrivedCount();
+      if (state.arrivedN) parts.push(state.arrivedN + " ya llegado" + (state.arrivedN === 1 ? "" : "s"));
     } else {
       parts = [total + " coordenada" + (total === 1 ? "" : "s"),
         flagged + " marcada" + (flagged === 1 ? "" : "s")];
@@ -2179,6 +2401,11 @@
       warns.push("⚠ " + parsed.inconsistent + " ataque" + (parsed.inconsistent === 1 ? "" : "s") +
         " con envío + duración que no cuadran con la llegada");
     }
+    if (parsed && parsed.duplicates) {
+      warns.push(parsed.duplicates + " línea" + (parsed.duplicates === 1 ? "" : "s") +
+        " duplicada" + (parsed.duplicates === 1 ? "" : "s") + " ignorada" + (parsed.duplicates === 1 ? "" : "s") +
+        " (el mismo comando pegado dos veces)");
+    }
     var trains = {};
     attacks.forEach(function (a) { if (a.train && a.train.noble) trains[a.train.id] = a.train.size; });
     var nTrains = Object.keys(trains).length;
@@ -2219,7 +2446,10 @@
     return opts;
   }
 
+  // Both drop the previous analysis: the minute tick and the table toggles
+  // re-show whatever state.rows holds.
   function fail(msg) {
+    state.rows = []; state.arrivedN = 0;
     $("status").textContent = msg;
     $("status").style.display = "";
     $("summary").hidden = true;
@@ -2233,6 +2463,7 @@
   // like the button did nothing. Anything that goes wrong must SAY so.
   function reportError(e) {
     if (window.console) console.error("Entrantes:", e);
+    state.rows = []; state.arrivedN = 0;
     var stale = typeof TW.srvEpoch !== "function" || typeof TW.apiFetch !== "function";
     $("status").textContent = stale
       ? "Tu navegador está usando una versión antigua de js/common.js en caché. " +
@@ -2305,6 +2536,7 @@
           // possible nuke a probable fake.
           var rt = reportTypeOf(a.origin.key);
           var originNote = (rt && !rt.stale && rt.sure) ? rt.type : null;
+          row.originNote = originNote;
           // CATAS (2026-08-06): the origin has qualifying catapult strikes on
           // record (sentCat: ≥50 cats, no regular ram off) AND this command
           // travels at a pace that could carry them (siege/noble speed; an
@@ -2541,6 +2773,11 @@
     $("groupbytarget").addEventListener("change", function () {
       if (state.rows.length) render();
     });
+    // Guarded: a cached pre-IF2 incomings.html has no such checkbox.
+    if ($("hidearrived")) $("hidearrived").addEventListener("change", function () {
+      if (state.rows.length) render();
+    });
+    setInterval(tickArrivals, 60000);
     // Re-run on setting change so the thresholds feel live once analysed.
     $("minpoints").addEventListener("change", function () { if (state.rows.length) analyze(); });
     $("maxdays").addEventListener("change", function () { if (state.rows.length) analyze(); });

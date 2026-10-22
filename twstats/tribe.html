@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>es103 · Tribu</title>
-  <link rel="stylesheet" href="css/twstats.css?v=20261004.1">
+  <link rel="stylesheet" href="css/twstats.css?v=20261022.2">
 </head>
 <body>
   <div id="main">
@@ -27,6 +27,7 @@
         <button type="button" class="tab" data-tab="pueblos">Pueblos</button>
         <button type="button" class="tab" data-tab="miembros">Miembros</button>
         <button type="button" class="tab" data-tab="conquistas">Conquistas</button>
+        <button type="button" class="tab" data-tab="rivales">Rivales</button>
       </nav>
 
       <section class="tab-panel" data-panel="perfil">
@@ -86,9 +87,20 @@
 
       <section class="tab-panel" data-panel="miembros" hidden>
         <div class="box-title sub">Miembros <span id="memberCount" class="count"></span></div>
-        <p class="tz-note">Columnas de día = ganancia de puntos ese día (últimos 7 días); Total = ganancia de 7 días.</p>
+        <div class="conq-filter" id="memberCompare" hidden>
+          <label for="memberMetric">Comparar:</label>
+          <select id="memberMetric">
+            <option value="points">Puntos</option>
+            <option value="villages">Pueblos</option>
+            <option value="od_total">OD</option>
+            <option value="od_att">ODA</option>
+            <option value="od_def">ODD</option>
+            <option value="od_sup">ODS</option>
+          </select>
+        </div>
+        <p class="tz-note" id="membersNote">Columnas de día = ganancia de puntos ese día (últimos 7 días); Total = ganancia de 7 días.</p>
         <div class="table-wrap">
-          <table class="vis widget">
+          <table class="vis widget sortable">
             <thead id="membersHead"></thead>
             <tbody id="membersBody"></tbody>
           </table>
@@ -100,6 +112,7 @@
           <button type="button" class="seg active" data-conq="all">Todo</button>
           <button type="button" class="seg" data-conq="gain">Ganados</button>
           <button type="button" class="seg" data-conq="lose">Perdidos</button>
+          <button type="button" class="seg" data-conq="internal" title="Pueblos que pasaron de un miembro de la tribu a otro">Internas</button>
         </div>
 
         <div id="gainsSection">
@@ -117,6 +130,11 @@
               </thead>
               <tbody id="gainsBody"></tbody>
             </table>
+          </div>
+          <div class="pager" id="gainsPager" hidden>
+            <button type="button" data-pg="prev">‹ Anterior</button>
+            <span class="pg-info" data-pg="info">—</span>
+            <button type="button" data-pg="next">Siguiente ›</button>
           </div>
         </div>
 
@@ -136,6 +154,50 @@
               <tbody id="lossesBody"></tbody>
             </table>
           </div>
+          <div class="pager" id="lossesPager" hidden>
+            <button type="button" data-pg="prev">‹ Anterior</button>
+            <span class="pg-info" data-pg="info">—</span>
+            <button type="button" data-pg="next">Siguiente ›</button>
+          </div>
+        </div>
+
+        <div id="internalSection">
+          <div class="box-title sub">Internas <span id="internalCount" class="count"></span></div>
+          <div class="table-wrap">
+            <table class="vis widget">
+              <thead>
+                <tr>
+                  <th class="c-vil">Pueblos</th>
+                  <th class="c-pts">Puntos</th>
+                  <th class="c-old">Antiguo Dueño</th>
+                  <th class="c-new">Nuevo Dueño</th>
+                  <th class="c-date">Fecha/Tiempo</th>
+                </tr>
+              </thead>
+              <tbody id="internalBody"></tbody>
+            </table>
+          </div>
+          <div class="pager" id="internalPager" hidden>
+            <button type="button" data-pg="prev">‹ Anterior</button>
+            <span class="pg-info" data-pg="info">—</span>
+            <button type="button" data-pg="next">Siguiente ›</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="rivales" hidden>
+        <div class="scope rival-range">
+          <button type="button" class="seg" data-range="7">7 días</button>
+          <button type="button" class="seg" data-range="30">30 días</button>
+          <button type="button" class="seg active" data-range="0">Todo</button>
+        </div>
+        <div class="box-title sub">Rivales <span id="rivalsCount" class="count"></span></div>
+        <p class="tz-note">Conquistas contra cada tribu (la tribu del jugador el día de la conquista). Las internas no cuentan. Neto = ganados − perdidos. Haz clic en una cabecera para ordenar.</p>
+        <div class="table-wrap">
+          <table class="vis widget sortable">
+            <thead id="rivalsHead"></thead>
+            <tbody id="rivalsBody"></tbody>
+          </table>
         </div>
       </section>
     </div>
@@ -143,8 +205,8 @@
     <p class="foot">Datos archivados del mundo es103. No oficial.</p>
   </div>
 
-  <script src="js/common.js?v=20261004.1"></script>
-  <script src="js/chart.js?v=20261004.1"></script>
-  <script src="js/tribe.js?v=20261004.1"></script>
+  <script src="js/common.js?v=20261022.2"></script>
+  <script src="js/chart.js?v=20261022.2"></script>
+  <script src="js/tribe.js?v=20261022.2"></script>
 </body>
 </html>

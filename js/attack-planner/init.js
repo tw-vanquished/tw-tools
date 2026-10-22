@@ -25,6 +25,7 @@ function renderAll() {
   applyTranslations();
   bindSettings();
   renderAll();
+  restoreLastTab();
   initBookmarklet();
   initScavengeBookmarklet();
   setInterval(updateCountdowns, 1000);

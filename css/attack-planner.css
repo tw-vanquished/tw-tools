@@ -64,7 +64,8 @@
     .tabs {
       display: flex;
       background: #1a1008;
-      border-bottom: 2px solid #4a3010;
+      /* the 2px rule is an inset shadow, not a border: a scrolling bar clips at its padding box */
+      box-shadow: inset 0 -2px 0 #4a3010;
       padding: 0 20px;
     }
     .tab {
@@ -76,10 +77,24 @@
       font-size: 13px;
       transition: color .15s;
       user-select: none;
-      margin-bottom: -2px;
     }
     .tab:hover { color: #c8a060; }
     .tab.active { color: #f0c040; border-bottom-color: #f0c040; }
+    .tab:focus-visible { outline: 2px solid #f0c040; outline-offset: -2px; }
+    /* Narrow screens: the bar scrolls sideways on its own instead of widening the page. */
+    .tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; scrollbar-color: #4a3010 #1a1008; }
+    .tab { flex: 0 0 auto; white-space: nowrap; }
+    @media (max-width: 600px) {
+      .tabs { padding: 0 8px; }
+      .tab { padding: 10px 12px; }
+    }
+    /* Bookmarklet panels: two options side by side, stacked on narrow screens. */
+    .bm-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    /* Attack Plan: ⚠ next to a double-booked sending village + the 'conflicts only' filter */
+    .conflict-badge { color: #e05050; font-weight: bold; cursor: help; }
+    .alert-lock { color: #e08070; font-size: 11px; white-space: nowrap; cursor: pointer; }
+    .conflict-filter { color: #e08070; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+    @media (max-width: 700px) { .bm-columns { grid-template-columns: 1fr; } }
 
     /* ── Tab content ── */
     .tab-content { display: none; padding: 22px 24px; }

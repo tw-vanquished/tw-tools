@@ -333,15 +333,23 @@ function computeScavengePlan(v) {
   });
   const maxSeconds = s.maxHours > 0 ? s.maxHours * 3600 : 0;
   const result = scavOptimize({ units: sendable, available, factor, mode: s.mode, maxSeconds });
-  // Comparison: everything into the best free option (what most people do).
+  // Comparison: everything into the best free option (what most people do). With a Max
+  // duration it is the CAPPED single-option run — only as much carry as finishes within the
+  // cap (scavSeconds inverted), `capped` flags it; no comparison when not even an empty-ish
+  // run fits (the cap is under the option's base time).
   let topIdx = -1;
   for (let i = 3; i >= 0; i--) if (available[i]) { topIdx = i; break; }
   let allIn = null;
   if (topIdx >= 0) {
-    const c = scavCarryOf(sendable);
+    let c = scavCarryOf(sendable), capped = false;
+    if (c > 0 && maxSeconds > 0 && scavSeconds(c, topIdx, factor) > maxSeconds) {
+      const room = maxSeconds / factor - SCAV_INIT;
+      c = room > 0 ? Math.floor(Math.sqrt(Math.pow(room, 1 / SCAV_EXP) / 100) / SCAV_LOOT[topIdx]) : 0;
+      capped = true;
+    }
     if (c > 0) {
       const sec = scavSeconds(c, topIdx, factor);
-      allIn = { n: topIdx + 1, loot: c * SCAV_LOOT[topIdx], seconds: sec, perHour: c * SCAV_LOOT[topIdx] / sec * 3600 };
+      allIn = { n: topIdx + 1, loot: c * SCAV_LOOT[topIdx], seconds: sec, perHour: c * SCAV_LOOT[topIdx] / sec * 3600, capped };
     }
   }
   return { ...result, sendable, available, factor, factorSource: source, maxSeconds, allIn };
@@ -351,13 +359,23 @@ function computeScavengePlan(v) {
 // SCAVENGING — import actions
 // ══════════════════════════════════════════════
 
+// The scavenging bookmarklet with its alerts in the current UI language (link + Copy).
+function scavengeBookmarkletCode() {
+  return 'javascript:' + bmLocalize(SCAVENGE_BOOKMARKLET, [
+    ["'Open the Rally Point → Scavenging page first.'", bmStr('bm_js_scav_no_page')],
+    ["'Copied scavenging data for '+(village.name||'this village')+' to clipboard! Go paste it in the Attack Planner → Scavenging tab.'",
+      bmStr('bm_js_scav_copied') + ".replace('{name}',function(){return village.name||" + bmStr('bm_js_this_village') + ';})'],
+    ["'Could not copy to clipboard. Try Chrome or Edge.'", bmStr('bm_js_copy_failed')],
+  ]);
+}
+
 function initScavengeBookmarklet() {
   const link = document.getElementById('bm-scav-link');
-  if (link) link.href = 'javascript:' + SCAVENGE_BOOKMARKLET;
+  if (link) link.href = scavengeBookmarkletCode();
 }
 
 function copyScavengeBookmarklet() {
-  const code = 'javascript:' + SCAVENGE_BOOKMARKLET;
+  const code = scavengeBookmarkletCode();
   navigator.clipboard.writeText(code)
     .then(() => alert(t('alert_bm_copied')))
     .catch(() => {
@@ -492,8 +510,16 @@ function scavOptionName(v, i) {
   const o = (v && v.options || [])[i];
   return (o && o.title) || t('scav_opt_' + (i + 1));
 }
-function scavStateBadge(state, returnIn) {
+// A running option's countdown is frozen at capture time: with `returnAt` (scavReturnAt) the
+// badge shows the clock time it comes back, or 'probably back' once that time has passed.
+function scavStateBadge(state, returnIn, returnAt) {
   if (state === 'free')   return `<span class="badge badge-complete">${t('scav_state_free')}</span>`;
+  if (state === 'busy' && returnAt != null) {
+    const clock = scavFmtClock(returnAt);
+    const label = returnAt <= Date.now() ? t('scav_state_back_prob').replace('{time}', clock)
+      : `${t('scav_state_busy')} · ${t('scav_back_at').replace('{time}', clock)}`;
+    return `<span class="badge badge-half" title="${escHtml(returnIn)}">${label}</span>`;
+  }
   if (state === 'busy')   return `<span class="badge badge-half">${t('scav_state_busy')}${returnIn ? ' · ' + escHtml(returnIn) : ''}</span>`;
   if (state === 'locked') return `<span class="badge badge-low">${t('scav_state_locked')}</span>`;
   return `<span class="badge badge-tq">${t('scav_state_unlocking')}</span>`;
@@ -507,6 +533,25 @@ function scavAge(iso) {
   const h = Math.floor(m / 60);
   if (h < 48) return t('scav_age_h').replace('{n}', h);
   return t('scav_age_d').replace('{n}', Math.floor(h / 24));
+}
+// When a running option's troops come back (ms epoch): capture time + the captured countdown.
+// null for any other state, or when the countdown / capture time cannot be read.
+function scavReturnAt(v, i) {
+  const o = (v && v.options || [])[i];
+  if (!o || o.state !== 'busy') return null;
+  const sec = scavParseHMS(o.returnIn);
+  const cap = new Date(v.capturedAt).getTime();
+  return sec === null || !(cap > 0) ? null : cap + sec * 1000;
+}
+// Local clock time of a ms epoch: 'HH:MM' today, 'tomorrow HH:MM', otherwise 'DD/MM HH:MM'.
+function scavFmtClock(ms, now) {
+  const d = new Date(ms), n = new Date(now === undefined ? Date.now() : now);
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(n)) / 86400000);
+  if (diff === 0) return hm;
+  if (diff === 1) return t('scav_tomorrow') + ' ' + hm;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${hm}`;
 }
 
 // `keepFocus` = the change came from a text input being typed in: rebuild only the results,
@@ -602,32 +647,43 @@ function renderScavenge(keepFocus) {
       <th>${t('scav_col_carry')}</th>
       <th>${t('scav_col_loot')}</th>
       <th>${t('scav_col_duration')}</th>
+      <th>${t('scav_col_back')}</th>
       <th>${t('scav_col_rate')}</th>
     </tr>`;
   }
+  // Send now → each run's clock return time; a running option keeps its captured return time.
+  const now = Date.now();
+  const backTimes = plan.options.map((o, i) => {
+    if (o.carry > 0) return now + o.seconds * 1000;
+    const r = scavReturnAt(v, i);
+    return r !== null && r > now ? r : null;
+  });
+  const backKnown = backTimes.filter(x => x !== null);
   if (tbody) {
     const rows = plan.options.map((o, i) => {
       const optState = (v.options || [])[i] || { state: 'free' };
       const empty = o.carry <= 0;
       const unitCells = unitList.map(u => `<td class="scav-num${o.units[u] ? '' : ' text-dim'}">${o.units[u] ? scavFmtNum(o.units[u]) : '—'}</td>`).join('');
       return `<tr class="${o.available ? '' : 'scav-row-unavailable'}">
-        <td><div class="scav-opt-name">${escHtml(scavOptionName(v, i))}</div>${scavStateBadge(optState.state, optState.returnIn)}</td>
+        <td><div class="scav-opt-name">${escHtml(scavOptionName(v, i))}</div>${scavStateBadge(optState.state, optState.returnIn, scavReturnAt(v, i))}</td>
         ${unitCells}
         <td class="scav-num">${empty ? '—' : scavFmtNum(o.carry)}</td>
         <td class="scav-num">${empty ? '—' : `<strong>${scavFmtNum(o.loot)}</strong><div class="scav-perres">${scavFmtNum(o.perRes)} / ${scavFmtNum(o.perRes)} / ${scavFmtNum(o.perRes)}</div>`}</td>
         <td class="scav-num">${empty ? '—' : scavFmtSeconds(o.seconds)}</td>
+        <td class="scav-num${empty ? ' text-dim' : ''}">${backTimes[i] !== null ? scavFmtClock(backTimes[i], now) : '—'}</td>
         <td class="scav-num">${empty ? '—' : scavFmtNum(o.perHour)}</td>
       </tr>`;
     });
     const homeCells = unitList.map(u => `<td class="scav-num text-dim">${plan.home[u] ? scavFmtNum(plan.home[u]) : '—'}</td>`).join('');
     const homeAny = unitList.some(u => plan.home[u] > 0);
     if (homeAny) {
-      rows.push(`<tr class="scav-row-home"><td>${t('scav_row_home')}</td>${homeCells}<td class="scav-num text-dim">${scavFmtNum(scavCarryOf(plan.home))}</td><td></td><td></td><td></td></tr>`);
+      rows.push(`<tr class="scav-row-home"><td>${t('scav_row_home')}</td>${homeCells}<td class="scav-num text-dim">${scavFmtNum(scavCarryOf(plan.home))}</td><td></td><td></td><td></td><td></td></tr>`);
     }
     rows.push(`<tr class="scav-row-total"><td>${t('scav_row_total')}</td>${unitList.map(() => '<td></td>').join('')}
       <td class="scav-num">${scavFmtNum(plan.options.reduce((a, o) => a + o.carry, 0))}</td>
       <td class="scav-num"><strong>${scavFmtNum(plan.totalLoot)}</strong></td>
       <td class="scav-num">${plan.longestSeconds > 0 ? scavFmtSeconds(plan.longestSeconds) : '—'}</td>
+      <td class="scav-num">${backKnown.length ? scavFmtClock(Math.max(...backKnown), now) : '—'}</td>
       <td class="scav-num"><strong>${scavFmtNum(plan.totalPerHour)}</strong></td></tr>`);
     tbody.innerHTML = rows.join('');
   }
@@ -636,12 +692,18 @@ function renderScavenge(keepFocus) {
   const sumEl = document.getElementById('scav-summary');
   if (sumEl) {
     const parts = [];
+    // A running option whose troops are back by now: the snapshot misses them (and the option
+    // is idle), so the split is stale — never flip it to free, ask for a fresh capture.
+    for (let i = 0; i < 4; i++) {
+      const back = scavReturnAt(v, i);
+      if (back !== null && back <= Date.now()) parts.push(t('scav_stale_busy').replace('{opt}', escHtml(scavOptionName(v, i))));
+    }
     if (plan.options.every(o => o.carry <= 0)) {
       parts.push(plan.available.some(Boolean) ? t('scav_no_troops') : t('scav_no_options'));
     } else {
       if (plan.allIn && plan.allIn.perHour > 0) {
         const gain = plan.totalPerHour / plan.allIn.perHour - 1;
-        parts.push(t('scav_vs_allin')
+        parts.push(t(plan.allIn.capped ? 'scav_vs_allin_cap' : 'scav_vs_allin')
           .replace('{opt}', scavOptionName(v, plan.allIn.n - 1))
           .replace('{rate}', scavFmtNum(plan.allIn.perHour))
           .replace('{loot}', scavFmtNum(plan.allIn.loot))
@@ -652,6 +714,12 @@ function renderScavenge(keepFocus) {
         parts.push(t('scav_cap_violated'));
       } else if (plan.maxSeconds > 0 && Object.values(plan.home).some(n => n > 0)) {
         parts.push(t('scav_cap_home'));
+      }
+      // When to log in again: the first run (or running option) back, and everything back.
+      if (backKnown.length) {
+        parts.push(t('scav_back_summary')
+          .replace('{first}', scavFmtClock(Math.min(...backKnown), now))
+          .replace('{all}', scavFmtClock(Math.max(...backKnown), now)));
       }
     }
     sumEl.innerHTML = parts.map(p => `<p>${p}</p>`).join('');

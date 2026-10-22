@@ -41,18 +41,98 @@
     ],
   };
 
-  var state = { mode: "players", cols: null, data: [], filtered: [], sort: 0, dir: "asc", query: "", page: 0 };
+  // OD mode (?mode=od&who=players|tribes&kind=all|att|def|sup): «Adversarios
+  // vencidos» rankings from the same players.json / tribes.json. v1 is
+  // frontend-only: «Rango OD» is the position by that OD in the archived data
+  // (competition ranking — ties share a place), not the official OD rank, and
+  // there is no OD Δ7d (both would need build.py). No OD → bottom, «—».
+  var OD_KINDS = {
+    all: { key: "od_total", label: "Total" }, att: { key: "od_att", label: "Atacante" },
+    def: { key: "od_def", label: "Defensor" }, sup: { key: "od_sup", label: "Apoyo" },
+  };
+  function odVal(r) {
+    var v = r[OD_KINDS[state.kind].key];
+    return v == null || v === "" ? null : +v;
+  }
+  function odCols(who, kind) {
+    var nameCol = who === "tribes" ? COLS.tribes[1] : COLS.players[1];
+    var cols = [
+      { label: "Rango OD", cls: "col-rank", dir: "asc", nullLast: true,
+        get: function (r) { return r._odRank; },
+        cell: function (r) { return "<td class='col-rank'>" + (r._odRank == null ? '<span class="barb">—</span>' : r._odRank + ".") + "</td>"; } },
+      nameCol,
+    ];
+    if (who === "players") cols.push(COLS.players[2]);   // Tribu
+    cols.push({
+      label: "OD " + OD_KINDS[kind].label, cls: "col-pts", dir: "desc", nullLast: true,
+      get: odVal,
+      cell: function (r) { var v = odVal(r); return v == null ? "<td class='col-pts'><span class='barb'>—</span></td>" : numTd(v); },
+    });
+    cols.push({ label: "Puntos", cls: "col-pts", dir: "desc", get: function (r) { return r.points; }, cell: ptsCell });
+    return cols;
+  }
+  // Competition ranking by the current OD kind: 1, 2, 2, 4 …; no OD → null.
+  function rankByOd(data) {
+    var withOd = data.filter(function (r) { return odVal(r) != null; })
+      .sort(function (a, b) { return odVal(b) - odVal(a); });
+    data.forEach(function (r) { r._odRank = null; });
+    for (var i = 0; i < withOd.length; i++) {
+      withOd[i]._odRank = (i && odVal(withOd[i]) === odVal(withOd[i - 1])) ? withOd[i - 1]._odRank : i + 1;
+    }
+  }
 
-  function readMode() {
-    var m = /[?&]mode=(\w+)/.exec(location.search);
-    return (m && m[1] === "tribes") ? "tribes" : "players";
+  // Archivo mode (?mode=archive&who=players|tribes): the players / tribes that
+  // left the world, from players-archive.json / tribes-archive.json (build.py:
+  // last snapshot + bests), newest «Visto por última vez» first. lastSeen is a
+  // daily bucket, so it is labelled by its UTC day. Names open the archived page.
+  function lastSeenCol() {
+    return { label: "Visto por última vez", cls: "col-date", dir: "desc",
+      get: function (r) { return r.lastSeen; },
+      cell: function (r) { return "<td class='col-date'>" + TW.fmtDayUTC(r.lastSeen) + "</td>"; } };
+  }
+  function numCol(label, key, dir) {
+    return { label: label, cls: "col-pts", dir: dir || "desc", get: function (r) { return r[key]; },
+      cell: function (r) { return numTd(r[key]); } };
+  }
+  var ARCH_TAIL = [
+    numCol("Últimos puntos", "lastPoints"), numCol("Últimos pueblos", "lastVillages"),
+    { label: "Mejor ranking", cls: "col-rank", dir: "asc", get: function (r) { return r.bestRank; },
+      cell: function (r) { return "<td class='col-rank'>" + r.bestRank + ".</td>"; } },
+    numCol("Máx. puntos", "maxPoints"), numCol("Conquistas", "conquests"), numCol("Perdidos", "lost"),
+  ];
+  var ARCH_COLS = {
+    players: [lastSeenCol(), COLS.players[1],
+      { label: "Última tribu", dir: "asc", get: function (r) { return r.lastTribe ? (r.lastTribe.tag || "").toLowerCase() : "￿"; },
+        cell: function (r) { return "<td>" + (r.lastTribe ? TW.tribeLink(r.lastTribe.id, r.lastTribe.tag) : '<span class="barb">—</span>') + "</td>"; } },
+    ].concat(ARCH_TAIL),
+    tribes: [lastSeenCol(), COLS.tribes[1],
+      { label: "Nombre", dir: "asc", get: function (r) { return (r.name || "").toLowerCase(); },
+        cell: function (r) { return "<td>" + TW.esc(r.name || "") + "</td>"; } },
+    ].concat(ARCH_TAIL),
+  };
+
+  var state = { mode: "players", who: "players", kind: "all", cols: null, data: [], filtered: [], sort: 0, dir: "asc", query: "", page: 0 };
+
+  function readParam(name, allowed, dflt) {
+    var m = new RegExp("[?&]" + name + "=(\\w+)").exec(location.search);
+    return (m && allowed.indexOf(m[1]) !== -1) ? m[1] : dflt;
+  }
+  function readMode() { return readParam("mode", ["players", "tribes", "od", "archive"], "players"); }
+  // players or tribes — in OD and Archivo mode the «… de» seg picks it.
+  function entity() { return state.mode === "od" || state.mode === "archive" ? state.who : state.mode; }
+  function fileName() { return entity() + (state.mode === "archive" ? "-archive" : "") + ".json"; }
+  function modeUrl() {
+    return "rankings.html?mode=" + state.mode +
+      (state.mode === "od" ? "&who=" + state.who + "&kind=" + state.kind : "") +
+      (state.mode === "archive" ? "&who=" + state.who : "");
   }
 
   function matches(r) {
     if (!state.query) return true;
-    var hay = (state.mode === "tribes")
+    var tribe = r.tribe || r.lastTribe;   // archived players carry their last tribe
+    var hay = (entity() === "tribes")
       ? (r.tag || "") + " " + (r.name || "")
-      : (r.name || "") + " " + (r.tribe ? r.tribe.tag : "");
+      : (r.name || "") + " " + (tribe ? tribe.tag : "");
     return hay.toLowerCase().indexOf(state.query) !== -1;
   }
 
@@ -60,9 +140,11 @@
     var col = state.cols[state.sort], mul = state.dir === "asc" ? 1 : -1;
     state.filtered.sort(function (a, b) {
       var va = col.get(a), vb = col.get(b);
+      // nullLast: a null value sinks in both directions (OD mode's «—» rows).
+      if (col.nullLast && (va == null) !== (vb == null)) return va == null ? 1 : -1;
       if (va < vb) return -1 * mul;
       if (va > vb) return 1 * mul;
-      return a.rank - b.rank; // stable tiebreak
+      return (a.rank || 0) - (b.rank || 0) || (+a.id) - (+b.id); // stable tiebreak (archive rows have no rank)
     });
   }
 
@@ -111,26 +193,51 @@
 
   function setMode(mode) {
     state.mode = mode;
-    state.cols = COLS[mode];
+    var od = mode === "od", archive = mode === "archive", ent = entity();
+    state.cols = od ? odCols(state.who, state.kind) : archive ? ARCH_COLS[ent] : COLS[mode];
     state.sort = 0; state.dir = state.cols[0].dir;
-    $("modeTitle").textContent = mode === "tribes" ? "Clasificación de tribus" : "Clasificación de jugadores";
-    document.title = "es103 · " + (mode === "tribes" ? "Tribus" : "Jugadores");
+    $("modeTitle").textContent = od
+      ? "Adversarios vencidos (" + OD_KINDS[state.kind].label.toLowerCase() + ") — " + (ent === "tribes" ? "tribus" : "jugadores")
+      : archive ? "Archivo — " + (ent === "tribes" ? "tribus" : "jugadores")
+      : (mode === "tribes" ? "Clasificación de tribus" : "Clasificación de jugadores");
+    document.title = "es103 · " + (od ? "OD " + OD_KINDS[state.kind].label + " · " : archive ? "Archivo · " : "") +
+      (ent === "tribes" ? "Tribus" : "Jugadores");
     $("modePlayers").classList.toggle("active", mode === "players");
     $("modeTribes").classList.toggle("active", mode === "tribes");
-    TW.renderNav(mode === "tribes" ? "tribus" : "jugadores");
+    if ($("modeOd")) $("modeOd").classList.toggle("active", od);
+    if ($("modeArchive")) $("modeArchive").classList.toggle("active", archive);
+    ["odWho", "odKind", "odNote"].forEach(function (id) { if ($(id)) $(id).hidden = !od; });
+    ["archWho", "archNote"].forEach(function (id) { if ($(id)) $(id).hidden = !archive; });
+    var segs = document.querySelectorAll("[data-who], [data-kind]");
+    for (var i = 0; i < segs.length; i++) {
+      var w = segs[i].getAttribute("data-who"), k = segs[i].getAttribute("data-kind");
+      segs[i].classList.toggle("active", w ? w === state.who : k === state.kind);
+    }
+    TW.renderNav(ent === "tribes" ? "tribus" : "jugadores");
   }
 
   function load(mode) {
     setMode(mode);
     $("status").style.display = "block";
     $("status").textContent = "Cargando…";
-    TW.loadJSON(mode + ".json")
+    var file = fileName();
+    TW.loadJSON(file)
       .then(function (d) {
+        if (fileName() !== file) return;   // a newer switch is loading
         state.data = d;
+        if (state.mode === "od") rankByOd(state.data);
         applyFilter();
         render();
       })
       .catch(function (e) {
+        if (fileName() !== file) return;
+        // Data built before the archive files existed: say so, empty table.
+        if (state.mode === "archive" && /HTTP 404/.test(e.message)) {
+          state.data = []; applyFilter(); render();
+          $("status").style.display = "block";
+          $("status").textContent = "El archivo aún no está disponible: se publica con la próxima actualización de los datos.";
+          return;
+        }
         $("status").textContent = "No se pudieron cargar los datos: " + e.message +
           "  (¿sirviendo por HTTP? file:// bloquea fetch)";
       });
@@ -138,13 +245,29 @@
 
   function switchMode(mode) {
     if (mode === state.mode) return;
-    history.replaceState(null, "", "rankings.html?mode=" + mode);
+    state.mode = mode;
+    history.replaceState(null, "", modeUrl());
     state.query = ""; $("search").value = "";
     load(mode);
+  }
+  // OD / Archivo segs: a new «OD de» / «Archivo de» reloads the other file; a
+  // new «Tipo» only re-ranks the loaded rows (same file). The search box is kept.
+  function setOd(who, kind) {
+    if ((state.mode !== "od" && state.mode !== "archive") || (who === state.who && kind === state.kind)) return;
+    var reload = who !== state.who;
+    state.who = who; state.kind = kind;
+    history.replaceState(null, "", modeUrl());
+    if (reload) { state.data = []; load(state.mode); return; }
+    setMode("od");
+    rankByOd(state.data);
+    applyFilter();
+    render();
   }
 
   function init() {
     TW.loadJSON("meta.json").then(function (m) { $("worldName").textContent = m.world || TW.WORLD; }).catch(function () {});
+    state.who = readParam("who", ["players", "tribes"], "players");
+    state.kind = readParam("kind", ["all", "att", "def", "sup"], "all");
     load(readMode());
 
     $("thead").addEventListener("click", function (e) {
@@ -157,6 +280,14 @@
     });
     $("modePlayers").addEventListener("click", function () { switchMode("players"); });
     $("modeTribes").addEventListener("click", function () { switchMode("tribes"); });
+    if ($("modeOd")) $("modeOd").addEventListener("click", function () { switchMode("od"); });
+    if ($("modeArchive")) $("modeArchive").addEventListener("click", function () { switchMode("archive"); });
+    var segs = document.querySelectorAll("[data-who], [data-kind]");
+    for (var i = 0; i < segs.length; i++) {
+      segs[i].addEventListener("click", function () {
+        setOd(this.getAttribute("data-who") || state.who, this.getAttribute("data-kind") || state.kind);
+      });
+    }
     $("prev").addEventListener("click", function () { if (state.page > 0) { state.page--; render(); } });
     $("next").addEventListener("click", function () { state.page++; render(); });
     var t;

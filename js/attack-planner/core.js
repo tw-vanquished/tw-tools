@@ -76,6 +76,43 @@ function windowSpanMs(from, to) {
   return ((b - a + 1440) % 1440) * 60000;
 }
 
+// A typed or imported time as zero-padded 'HH:MM' ('7:30' → '07:30'), or '' when it isn't a
+// real time of day. Date parsing rejects a one-digit hour ('…T7:30:00' is Invalid Date), so
+// every stored time goes through here and landingISO re-checks old saved ones.
+function normHHMM(s) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '').trim());
+  return m && +m[1] < 24 && +m[2] < 60 ? m[1].padStart(2, '0') + ':' + m[2] : '';
+}
+
+// Divided Off (v1.12.0, the owner's choice 2026-10-22: the escort follows the plan). An unticked
+// noble village that also sends its own off in this plan keeps its army for that off: its noble
+// links carry the noble plus only the per-noble escort set in Auto-Generate (none by default),
+// and the off leaves that escort at home. Without an off of its own, or with Divided Off ticked,
+// the village's axes and LC are split over its nobles as before.
+function nobleEscortSetting() {
+  const n = x => Math.max(0, Math.floor(+x) || 0);
+  return { axe: n(DATA.settings.nobleEscortAxe), light: n(DATA.settings.nobleEscortLc) };
+}
+
+// The escort argument buildAttackUrl takes for `atk`: per noble for a snob row, the total left at
+// home for an off row, null when the old split / full-army link applies. The per-noble escort is
+// capped so the village's own noble links never ask for more axes/LC than it has.
+function escortFor(atk, attacks, village) {
+  if (!village || (atk.type !== 'snob' && atk.type !== 'off')) return null;
+  const own = a => a.fromId === atk.fromId;
+  if (!attacks.some(a => own(a) && a.type === 'off')) return null;
+  if (atk.type === 'snob' && atk.dividedOff) return null;
+  const nobles = attacks.filter(a => own(a) && a.type === 'snob' && !a.dividedOff && !a.sent)
+    .reduce((s, a) => s + Math.max(1, a.nobleCount || 1), 0);
+  const esc = nobleEscortSetting();
+  const per = {
+    axe:   nobles ? Math.min(esc.axe,   Math.floor((village.axes || 0) / nobles)) : esc.axe,
+    light: nobles ? Math.min(esc.light, Math.floor((village.lc   || 0) / nobles)) : esc.light,
+  };
+  if (atk.type === 'snob') return per;
+  return nobles && (per.axe || per.light) ? { axe: per.axe * nobles, light: per.light * nobles } : null;
+}
+
 function computeAttackRow(atk) {
   const village = DATA.villages.find(v => v.id === atk.fromId);
   const target  = DATA.targets.find(t => t.id === atk.targetId);
@@ -101,12 +138,15 @@ function computeAttackRow(atk) {
     village,
     atk.nobleCount,
     atk.dividedOff,
-    atk.catCount
+    atk.catCount,
+    escortFor(atk, DATA.attacks, village)
   );
   return { d, tMs, sendMs, sendEndMs, landMs, url };
 }
 
-function buildAttackUrl(server, fromVillageId, targetVillageId, type, village, nobleCount, dividedOff = false, catCount = 0) {
+// `escort` (see escortFor): for a snob link the per-noble escort when the village also sends its
+// own off, for an off link the axes/LC its noble links take along; null = the classic links.
+function buildAttackUrl(server, fromVillageId, targetVillageId, type, village, nobleCount, dividedOff = false, catCount = 0, escort = null) {
   // A village imported in sitter mode carries the sat account's id: without t= the game opens
   // the rally point as your own account. First, as in the game's own links.
   const sit  = village && village.t ? `t=${village.t}&` : '';
@@ -120,9 +160,14 @@ function buildAttackUrl(server, fromVillageId, targetVillageId, type, village, n
     return `${base}&catapult=${catCount || village.cats || 0}`;
   }
   if (type === 'off') {
-    return `${base}&axe=${village.axes||0}&light=${village.lc||0}&ram=${village.rams||0}&catapult=${village.cats||0}`;
+    const keep = escort || { axe: 0, light: 0 };
+    return `${base}&axe=${Math.max(0, (village.axes||0) - keep.axe)}&light=${Math.max(0, (village.lc||0) - keep.light)}&ram=${village.rams||0}&catapult=${village.cats||0}`;
   }
-  // snob — always send 1 noble per URL; escort = troops divided by noble count
+  // snob — always send 1 noble per URL. The village's army goes in its own off: only the
+  // per-noble escort rides along. Otherwise (or Divided Off): its axes/LC split over the nobles.
+  if (escort && !dividedOff) {
+    return `${base}&snob=1` + (escort.axe ? `&axe=${escort.axe}` : '') + (escort.light ? `&light=${escort.light}` : '');
+  }
   const nc = Math.max(1, nobleCount || 1);
   return `${base}&snob=1&axe=${Math.floor((village.axes||0)/nc)}&light=${Math.floor((village.lc||0)/nc)}`;
 }

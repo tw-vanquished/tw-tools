@@ -87,6 +87,8 @@ function toggleSent(id) {
   const a = DATA.attacks.find(a => a.id === id);
   if (!a) return;
   a.sent = !a.sent;
+  // when it was marked: village counts imported later already lack its troops (see sentPool)
+  if (a.sent) a.sentAt = Date.now(); else delete a.sentAt;
   saveData();
   renderAttacks();
 }
@@ -111,10 +113,12 @@ const REPLACE_REQ_UNITS = { off: ['ram', 'axe'], snob: ['snob'], fake: ['fake'],
 const REPLACE_MIN_OFF_POW = 300000;
 
 // The My-Villages entry a pinned requirement names (rally-URL village ID first, coords second).
+// An ID match at other coords than srcCoord is a stale pin (village coords never change).
 function pinnedVillage(req) {
   if (!req) return null;
   const vid = req.srcVillageId ? String(req.srcVillageId) : '';
-  return (vid && DATA.villages.find(v => String(v.villageId) === vid))
+  const byId = vid && DATA.villages.find(v => String(v.villageId) === vid);
+  return (byId && (!req.srcCoord || `${byId.x}|${byId.y}` === req.srcCoord) ? byId : null)
       || (req.srcCoord && DATA.villages.find(v => `${v.x}|${v.y}` === req.srcCoord))
       || null;
 }
@@ -148,6 +152,54 @@ function assignedSenders(excludeId) {
     add(v.id, tg.id, r.unitType === 'snob' ? 'snob' : r.unitType === 'catapult' ? 'catapult' : 'off');
   }));
   return map;
+}
+
+// Attack Plan rows whose sending village is double-booked (a read-only warning; nothing is
+// re-assigned): rowId → the village's OTHER commitments [{ targetId, kind, sent }]. Same troop
+// model as Auto-Generate: a village sends ONE off — another off row, or an off pin of another
+// target in the Targets tab (assignedSenders), clashes; noble trains clash when the unsent ones
+// need more nobles than the village has; catapult attacks when the unsent ones need more
+// catapults (0 = all of them). An off plus a noble train or a catapult attack from one village
+// is the normal pattern and never flagged. Fakes and Unassigned rows never count; Sent rows
+// count as commitments of the village but are not flagged themselves (their troops are out).
+function senderConflicts() {
+  const out = new Map();
+  const senders = assignedSenders(null);
+  const byVillage = new Map();
+  DATA.attacks.forEach(a => {
+    if (!a.fromId || a.type === 'fake' || a.type === 'unassigned') return;
+    if (!byVillage.has(a.fromId)) byVillage.set(a.fromId, []);
+    byVillage.get(a.fromId).push(a);
+  });
+  const entry = b => ({ targetId: b.targetId, kind: b.type, sent: !!b.sent });
+  byVillage.forEach((rows, vid) => {
+    const v = DATA.villages.find(x => x.id === vid) || {};
+    rows.filter(a => a.type === 'off' && !a.sent).forEach(a => {
+      const others = (senders.get(vid) || []).filter(e => e.kind === 'off' && e.targetId !== a.targetId)
+        .map(e => { const r = rows.find(b => b.type === 'off' && b.targetId === e.targetId); return { targetId: e.targetId, kind: 'off', sent: !!(r && r.sent) }; });
+      const twins = rows.filter(b => b !== a && b.type === 'off' && b.targetId === a.targetId).map(entry);
+      if (others.length || twins.length) out.set(a.id, [...twins, ...others]);
+    });
+    // Sent rows still used the village's troops, so they count toward the total while its counts
+    // predate the send (as in Auto-Generate's sentPool: counts imported after ✓ Sent already lack
+    // them; no stamp = they count); only unsent rows are flagged
+    const counted = rows.filter(a => !a.sent || !(a.sentAt && v.troopsAt && a.sentAt <= v.troopsAt));
+    const pool = (type, need, have) => {
+      const list = counted.filter(a => a.type === type);
+      const open = list.filter(a => !a.sent);
+      if (list.length < 2 || !open.length || list.reduce((s, a) => s + need(a), 0) <= have) return;
+      open.forEach(a => out.set(a.id, list.filter(b => b !== a).map(entry)));
+    };
+    pool('snob', a => a.nobleCount || 1, v.nobles || 0);
+    pool('catapult', a => a.catCount || v.cats || 0, v.cats || 0);
+    // two attacks that each take ALL the catapults clash even when the count is unknown (0)
+    const allCats = counted.filter(a => a.type === 'catapult' && !a.catCount);
+    if (allCats.length && counted.filter(a => a.type === 'catapult').length > 1) {
+      counted.filter(a => a.type === 'catapult' && !a.sent).forEach(a =>
+        out.set(a.id, counted.filter(b => b !== a && b.type === 'catapult').map(entry)));
+    }
+  });
+  return out;
 }
 
 // Every village that could take over `atk`: it holds the troops the attack type needs (a noble
@@ -198,7 +250,12 @@ function applyReplace(attackId, villageId) {
     const units = REPLACE_REQ_UNITS[a.type] || [];
     const req = (target.requirements || []).find(r =>
       units.includes(r.unitType) && pinnedVillage(r) === old && (r.timeFrom || '') === (a.windowFrom || ''));
-    if (req) { req.srcCoord = `${v.x}|${v.y}`; req.srcVillageId = String(v.villageId || ''); }
+    if (req) {
+      req.srcCoord = `${v.x}|${v.y}`; req.srcVillageId = String(v.villageId || '');
+      // the sitted-account id follows the sender: a stale one would be written onto the new
+      // village by the next Auto-Generate (resolvePinned) and open its links as the wrong account
+      if (v.t) req.srcT = String(v.t); else delete req.srcT;
+    }
   }
   a.fromId = v.id;
   return a;
@@ -332,11 +389,14 @@ function exportToNotepad() {
   openModal('modal-export');
 }
 
-function copyExportText() {
+// `btn` = the clicked button (onclick="copyExportText(this)") — the global `event` is gone by
+// the time the clipboard promise settles. The fallback is the rejection handler only, so a
+// feedback error can never trigger a second copy.
+function copyExportText(btn) {
   const ta = document.getElementById('export-text');
-  navigator.clipboard.writeText(ta.value)
-    .then(() => { const btn = event.target; const orig = btn.textContent; btn.textContent = t('btn_copied'); setTimeout(() => btn.textContent = orig, 1500); })
-    .catch(() => { ta.select(); document.execCommand('copy'); });
+  navigator.clipboard.writeText(ta.value).then(
+    () => { const orig = btn.textContent; btn.textContent = t('btn_copied'); setTimeout(() => btn.textContent = orig, 1500); },
+    () => { ta.select(); document.execCommand('copy'); });
 }
 
 function clearSent() {
@@ -367,13 +427,25 @@ function copyUrl(id) {
   if (!a) return;
   const row = computeAttackRow(a);
   if (!row) return;
-  navigator.clipboard.writeText(row.url).then(() => {
+  const confirmCopied = () => {
     const btn = document.getElementById('copy-btn-' + id);
     if (btn) {
       const orig = btn.textContent;
       btn.textContent = '✓';
       setTimeout(() => { btn.textContent = orig; }, 1200);
     }
+  };
+  // Clipboard refused (permissions, unfocused page): copy through a hidden textarea instead,
+  // as copyScavengeBookmarklet does.
+  navigator.clipboard.writeText(row.url).then(confirmCopied, () => {
+    const ta = document.createElement('textarea');
+    ta.value = row.url;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    confirmCopied();
   });
 }
 
@@ -404,8 +476,19 @@ function renderAttacks() {
   const fVname  = fv('af-villageName');
   const fPlayer = fv('af-playerName');
   const fType   = fv('af-type');
+  // ⚠ double-booked senders (senderConflicts); the 'conflicts only' box shows only those rows
+  const conflicts = senderConflicts();
+  const cfBox  = document.getElementById('af-conflicts');
+  const fConfl = !!(cfBox && cfBox.checked);
+  const cfWrap = document.getElementById('af-conflicts-wrap');
+  if (cfWrap) {
+    cfWrap.style.display = conflicts.size || fConfl ? '' : 'none';
+    const n = cfWrap.querySelector('.cf-count');
+    if (n) n.textContent = conflicts.size;
+  }
 
   const filtered = rows.filter(({ atk, village, target }) => {
+    if (fConfl  && !conflicts.has(atk.id))                                       return false;
     if (fFrom   && !(village?.name  || '').toLowerCase().includes(fFrom))        return false;
     if (fTarget && !`${target?.x||''}|${target?.y||''}`.includes(fTarget))       return false;
     if (fVname  && !(target?.name   || '').toLowerCase().includes(fVname))       return false;
@@ -446,7 +529,7 @@ function renderAttacks() {
   });
 
   if (filtered.length === 0) {
-    const hasFilter = fFrom || fTarget || fVname || fPlayer || fType;
+    const hasFilter = fFrom || fTarget || fVname || fPlayer || fType || fConfl;
     tbody.innerHTML = `<tr class="empty-row"><td colspan="14">${hasFilter ? t('empty_attacks_filtered') : t('empty_attacks')}</td></tr>`;
     return;
   }
@@ -459,8 +542,14 @@ function renderAttacks() {
     const playerUrl  = id => `https://${server}/game.php?screen=info_player&id=${id}`;
 
     // From village
-    const fromLabel = village ? escHtml(village.name) : `<span class="text-dim">Unknown</span>`;
+    const fromLabel = village ? escHtml(village.name) : `<span class="text-dim">${t('unknown_village')}</span>`;
     const fromName  = village?.villageId ? twLink(villageUrl(village.villageId), fromLabel) : fromLabel;
+    const conflict  = conflicts.get(a.id);
+    const tgtCoord  = id => { const tg = DATA.targets.find(x => x.id === id); return tg ? `${tg.x}|${tg.y}` : '?'; };
+    const conflictBadge = conflict
+      ? ` <span class="conflict-badge" title="${escHtml(t('conflict_title') + '\n' + conflict.map(e =>
+          `${e.kind === 'snob' ? '👑' : e.kind === 'catapult' ? '💥' : '⚔'} → ${tgtCoord(e.targetId)}${e.sent ? ' (' + t('conflict_sent') + ')' : ''}`).join('\n'))}">⚠</span>`
+      : '';
 
     // Target coords
     const coordSpan   = target ? `<span class="coords">${target.x}|${target.y}</span>` : `<span class="text-dim">—</span>`;
@@ -485,14 +574,15 @@ function renderAttacks() {
     const playerName = (rawPlayer && playerId) ? twLink(playerUrl(playerId), escHtml(rawPlayer)) : pLabel;
     // ── Unassigned placeholder row ──
     if (a.type === 'unassigned') {
-      const unitLabel = a.unitType === 'snob' ? '👑 snob' : a.unitType === 'axe' ? '🪓 1/2' : a.unitType === 'catapult' ? '💥 cat' : '⚔ off';
+      // a partial snob train's shortfall row carries the missing nobles (×N)
+      const unitLabel = a.unitType === 'snob' ? '👑 snob' + (a.nobleCount ? ` ×${a.nobleCount}` : '') : a.unitType === 'axe' ? '🪓 1/2' : a.unitType === 'catapult' ? '💥 cat' : '⚔ off';
       const unitCls   = a.unitType === 'snob' ? 'req-snob' : a.unitType === 'axe' ? 'req-axe' : a.unitType === 'catapult' ? 'req-catapult' : 'req-ram';
       const winText   = fmtTimeWindow(a.windowFrom, a.windowTo);
       const winLabel  = winText
         ? `<span style="font-family:monospace;color:#6090c0;font-size:11px">${escHtml(winText)}</span>`
         : '<span class="text-dim">—</span>';
       return `<tr id="row-${a.id}" class="row-unassigned">
-        <td><span style="color:#e05050;font-weight:bold">⚠ Unassigned</span></td>
+        <td><span style="color:#e05050;font-weight:bold">${t('unassigned')}</span></td>
         <td>${targetCoord}</td>
         <td>${villageName}</td>
         <td>${playerName}</td>
@@ -543,7 +633,7 @@ function renderAttacks() {
     const sentClass = a.sent ? 'btn-ghost' : 'btn-sent';
 
     return `<tr id="row-${a.id}" class="${a.sent ? 'row-sent' : ''}">
-      <td>${fromName}</td>
+      <td>${fromName}${conflictBadge}</td>
       <td>${targetCoord}</td>
       <td>${villageName}</td>
       <td>${playerName}</td>
@@ -635,6 +725,103 @@ function updateCountdowns() {
       rowEl.className  = 'row-now';
     }
   });
+  checkSendAlerts(now);
+}
+
+// ══════════════════════════════════════════════
+// PRE-SEND ALERT — beep + title flash N minutes before a send window opens (default off)
+// ══════════════════════════════════════════════
+
+// Rows whose alert is due now: unsent real attacks whose send window opens within `minutes`
+// (or is open and still sendable), not alerted yet (`fired`: keys `${id}@${sendMs}`, so a row
+// moved to another time alerts again). Late rows never alert. A background tab's timer can be
+// throttled to once a minute, so this is a "within N" test, never an exact crossing.
+function dueSendAlerts(attacks, now, minutes, fired, computeRow) {
+  if (!(minutes > 0)) return [];
+  const due = [];
+  attacks.forEach(a => {
+    if (a.sent || !a.fromId || a.type === 'unassigned') return;
+    const c = computeRow(a);
+    if (!c) return;
+    const key = `${a.id}@${c.sendMs}`;
+    const diff = c.sendMs - now, endDiff = (c.sendEndMs || c.sendMs) - now;
+    if (fired.has(key) || diff > minutes * 60000 || endDiff <= 0) return;
+    due.push({ atk: a, key });
+  });
+  return due;
+}
+
+const sendAlertFired = new Set();
+let sendAlertAudio = null, sendAlertFlashTimer = null, sendAlertBaseTitle = '';
+
+// Browsers only let a page play sound after a user gesture: create / resume the AudioContext
+// from one (the setting's change, or any click / key press while alerts are on).
+function primeSendAlertAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try {
+    if (!sendAlertAudio) sendAlertAudio = new AC();
+    if (sendAlertAudio.state === 'suspended') sendAlertAudio.resume();
+  } catch (e) { sendAlertAudio = null; }
+  return sendAlertAudio;
+}
+
+// Two short 880 Hz pulses, generated in code (no sound file — works under file://).
+function playSendAlertBeep() {
+  const ctx = primeSendAlertAudio();
+  if (!ctx) return;
+  try {
+    [0, 0.25].forEach(at => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      const t0 = ctx.currentTime + at;
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.2);
+    });
+  } catch (e) { /* no audio: the title flash still runs */ }
+}
+
+// Alternate the tab title with `text` for ~20 s, or until the page is looked at again.
+function flashSendAlertTitle(text) {
+  stopSendAlertFlash();
+  sendAlertBaseTitle = document.title;
+  let n = 1;   // the text shows at once, then base / text alternate each second
+  sendAlertFlashTimer = setInterval(() => {
+    document.title = n % 2 ? sendAlertBaseTitle : text;
+    if (++n > 20) stopSendAlertFlash();
+  }, 1000);
+  document.title = text;
+}
+function stopSendAlertFlash() {
+  if (!sendAlertFlashTimer) return;
+  clearInterval(sendAlertFlashTimer);
+  sendAlertFlashTimer = null;
+  document.title = sendAlertBaseTitle;
+}
+
+// Called every countdown tick: one beep + one flash per tick, however many rows are due.
+function checkSendAlerts(now) {
+  const minutes = parseFloat(DATA.settings.alertMin) || 0;
+  // Alerts on but the browser has not allowed sound yet (a reload needs a click / key press):
+  // say so next to the field, so a background alert is not silently a title flash only.
+  const lock = document.getElementById('cfg-alert-lock');
+  if (lock) {
+    const canPlay = !!(window.AudioContext || window.webkitAudioContext);
+    lock.style.display = minutes > 0 && canPlay && !(sendAlertAudio && sendAlertAudio.state === 'running') ? '' : 'none';
+  }
+  const due = dueSendAlerts(DATA.attacks, now, minutes, sendAlertFired, computeAttackRow);
+  if (!due.length) return;
+  due.forEach(d => sendAlertFired.add(d.key));
+  const coords = due.map(d => { const tg = DATA.targets.find(x => x.id === d.atk.targetId); return tg ? `${tg.x}|${tg.y}` : '?'; });
+  playSendAlertBeep();
+  // a long list (a reload mid-op) is capped: first 3 coords, then +N
+  const list = coords.slice(0, 3).join(', ') + (coords.length > 3 ? ` +${coords.length - 3}` : '');
+  flashSendAlertTitle(t('alert_flash').replace('{coord}', list));
 }
 
 // ══════════════════════════════════════════════
@@ -649,8 +836,8 @@ function refreshDropdowns() {
     `<option value="${t.id}">${escHtml(t.name)} (${t.x}|${t.y})</option>`
   ).join('');
 
-  const emptyVillage = `<option value="">-- Select Village --</option>`;
-  const emptyTarget  = `<option value="">-- Select Target --</option>`;
+  const emptyVillage = `<option value="">${t('sel_village')}</option>`;
+  const emptyTarget  = `<option value="">${t('sel_target')}</option>`;
 
   document.getElementById('aa-from').innerHTML   = emptyVillage + villageOptions;
   document.getElementById('aa-target').innerHTML = emptyTarget  + targetOptions;
@@ -677,6 +864,8 @@ function applySettings() {
   document.getElementById('cfg-ws').value     = DATA.settings.worldSpeed  || 2;
   document.getElementById('cfg-us').value     = DATA.settings.unitSpeed   || 0.5;
   document.getElementById('cfg-player').value = DATA.settings.playerName  || '';
+  const al = document.getElementById('cfg-alert');
+  if (al) al.value = parseFloat(DATA.settings.alertMin) > 0 ? DATA.settings.alertMin : '';
 }
 
 function bindSettings() {
@@ -700,6 +889,21 @@ function bindSettings() {
     DATA.settings.playerName = e.target.value.trim();
     saveData();
   });
+  const al = document.getElementById('cfg-alert');
+  if (al) al.addEventListener('change', e => {
+    const n = Math.max(0, parseFloat(e.target.value) || 0);
+    DATA.settings.alertMin = n;
+    e.target.value = n > 0 ? n : '';
+    saveData();
+    if (n > 0) playSendAlertBeep();   // inside the gesture: unlocks sound + lets the user hear it
+  });
+  // after a reload sound needs a fresh gesture: the first click / key press unlocks it
+  const unlock = () => { if (parseFloat(DATA.settings.alertMin) > 0) primeSendAlertAudio(); };
+  document.addEventListener('pointerdown', unlock);
+  document.addEventListener('keydown', unlock);
+  // the alerted tab is looked at again → stop flashing its title
+  window.addEventListener('focus', stopSendAlertFlash);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) stopSendAlertFlash(); });
 }
 
 // ══════════════════════════════════════════════
@@ -708,13 +912,24 @@ function bindSettings() {
 
 const ATTACK_BOOKMARKLET = `(function(){var tbodies=document.querySelectorAll('tbody.row_marker');if(!tbodies.length){alert('No villages found. Make sure you are on the Mass Recruit page (Overview Villages \u2192 Recruit).');return;}var villages=[];tbodies.forEach(function(tbody){var anyInp=tbody.querySelector('input[name^="units["]');if(!anyInp)return;var m=anyInp.name.match(/units\\[(\\d+)\\]/);if(!m)return;var vid=m[1];var link=tbody.querySelector('td a');if(!link)return;var txt=link.textContent.trim();var cm=txt.match(/\\((\\d+)\\|(\\d+)\\)/);if(!cm)return;var name=txt.replace(/\\s*\\(.*/,'').trim();function get(unit){var inp=tbody.querySelector('input[name="units['+vid+']['+unit+']"]');return inp?parseInt(inp.getAttribute('data-existing'))||0:0;}villages.push({id:vid,name:name,x:parseInt(cm[1]),y:parseInt(cm[2]),axes:get('axe'),lc:get('light'),rams:get('ram'),cats:get('catapult'),nobles:get('snob')});});if(!villages.length){alert('Could not parse any village data.');return;}var t=(/[?&]t=(\\d+)/.exec(location.search)||[])[1]||'';try{if(!t&&window.game_data&&parseInt(game_data.player.sitter)>0)t=String(game_data.player.id);}catch(e){}var out={server:location.hostname,villages:villages};if(t)out.t=t;var json=JSON.stringify(out,null,2);var more=!/[?&]page=-1/.test(location.search)&&document.querySelector('a.paged-nav-item[href*="page=-1"]')?'\\n\\nOnly the villages on this page were copied. To get all of them, open the list\\'s [all] page ([todos] on .es) and click the bookmark again.':'';navigator.clipboard.writeText(json).then(function(){alert('Copied '+villages.length+' villages to clipboard! Go paste it in the Attack Planner.'+more);}).catch(function(){alert('Could not copy to clipboard. Try Chrome or Edge.');});})();`;
 
+// The village bookmarklet with its alerts in the current UI language (link + Copy).
+function attackBookmarkletCode() {
+  return 'javascript:' + bmLocalize(ATTACK_BOOKMARKLET, [
+    ["'No villages found. Make sure you are on the Mass Recruit page (Overview Villages → Recruit).'", bmStr('bm_js_no_villages')],
+    ["'Could not parse any village data.'", bmStr('bm_js_no_data')],
+    ["'\\n\\nOnly the villages on this page were copied. To get all of them, open the list\\'s [all] page ([todos] on .es) and click the bookmark again.'", bmStr('bm_js_paged', '\n\n')],
+    ["'Copied '+villages.length+' villages to clipboard! Go paste it in the Attack Planner.'", bmStr('bm_js_copied') + ".replace('{n}',villages.length)"],
+    ["'Could not copy to clipboard. Try Chrome or Edge.'", bmStr('bm_js_copy_failed')],
+  ]);
+}
+
 function initBookmarklet() {
   const link = document.getElementById('bm-link');
-  if (link) link.href = 'javascript:' + ATTACK_BOOKMARKLET;
+  if (link) link.href = attackBookmarkletCode();
 }
 
 function copyBookmarklet() {
-  const code = 'javascript:' + ATTACK_BOOKMARKLET;
+  const code = attackBookmarkletCode();
   navigator.clipboard.writeText(code)
     .then(() => alert(t('alert_bm_copied')))
     .catch(() => {
@@ -733,7 +948,7 @@ function pasteVillages() {
   navigator.clipboard.readText()
     .then(text => processVillagesJSON(text))
     .catch(() => {
-      const text = prompt('Paste the village JSON here:');
+      const text = prompt(t('villages_paste_prompt'));
       if (text) processVillagesJSON(text);
     });
 }
@@ -765,6 +980,7 @@ function processVillagesJSON(text) {
         if (pv.rams   !== undefined) existing.rams   = pv.rams   || 0;
         if (pv.cats   !== undefined) existing.cats   = pv.cats   || 0;
         if (pv.nobles !== undefined) existing.nobles = pv.nobles || 0;
+        if (['axes', 'lc', 'rams', 'cats', 'nobles'].some(k => pv[k] !== undefined)) existing.troopsAt = Date.now();
         if (sitT) existing.t = sitT; else delete existing.t;
         updated++;
       } else {
@@ -779,6 +995,7 @@ function processVillagesJSON(text) {
           rams:       pv.rams   || 0,
           cats:       pv.cats   || 0,
           nobles:     pv.nobles || 0,
+          troopsAt:   Date.now(),
           ...(sitT ? { t: sitT } : {}),
         });
         added++;
@@ -873,6 +1090,7 @@ function importFromRecruitHTML(event) {
         existing.rams   = pv.rams;
         existing.cats   = pv.cats;
         existing.nobles = pv.nobles;
+        existing.troopsAt = Date.now();
         if (pv.t) existing.t = pv.t; else delete existing.t;
         updated++;
       } else {
@@ -887,6 +1105,7 @@ function importFromRecruitHTML(event) {
           rams:      pv.rams,
           cats:      pv.cats,
           nobles:    pv.nobles,
+          troopsAt:  Date.now(),
           ...(pv.t ? { t: pv.t } : {}),
         });
         added++;

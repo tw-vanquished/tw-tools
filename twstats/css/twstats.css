@@ -113,6 +113,7 @@ a:hover, a:active { color: var(--link-hover); text-decoration: none; }
   padding: 8px; margin-bottom: 10px; font-weight: 700;
 }
 .conquer-filters .f { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.conquer-filters .f[hidden] { display: none; }  /* rankings OD / Archivo segs outside their mode */
 .conquer-filters label { color: var(--text-muted); }
 .conquer-filters input[type="text"],
 .conquer-filters input[type="search"],
@@ -139,7 +140,15 @@ button:disabled { opacity: .45; cursor: default; }
 .scope .seg:first-child { border-radius: 3px 0 0 3px; }
 .scope .seg:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
 .scope .seg.active { background: var(--bg-tab-active); }
-.conq-filter { margin-bottom: 10px; }
+.conq-filter, .rival-range { margin-bottom: 10px; }
+/* tribe Miembros «Comparar:» metric select (styled as the filter-bar selects) */
+#memberCompare { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+#memberCompare[hidden] { display: none; }
+#memberCompare select {
+  background: var(--bg-input); color: var(--text-primary);
+  border: 1px solid var(--border-secondary); border-radius: 3px;
+  padding: 3px 6px; font-family: Verdana, Arial, sans-serif; font-size: 12px;
+}
 
 .tz-note { margin: 0 0 8px; color: var(--text-muted); font-size: 11px; font-weight: 400; }
 .status { margin: 6px 2px; color: var(--text-muted); font-size: 12px; }
@@ -171,7 +180,8 @@ table.vis tbody tr:hover td { background-color: var(--bg-tab-active); }
 
 /* Pager */
 .pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0 2px; }
-#pageInfo { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pager[hidden] { display: none; }
+#pageInfo, .pg-info { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .foot { text-align: center; color: var(--text-muted); font-size: 11px; padding: 12px 8px 4px; }
 
@@ -421,6 +431,9 @@ table.vis.own-villages td.zero { color: var(--text-muted); opacity: .5; }
 #warnLine { color: var(--delta-down); font-weight: 700; }
 @media (max-width: 640px) { .filter-grid { grid-template-columns: 1fr; } }
 .derived { font-style: italic; border-bottom: 1px dotted var(--border-dark); cursor: help; }
+/* Entrantes «Llega en»: countdown under the arrival; muted once it landed. */
+.arr-rel { font-size: 11px; font-weight: 700; color: var(--link-color); }
+.arr-rel.arr-done { color: var(--text-muted); font-weight: 400; }
 .flag-nosent { color: var(--link-color); border-color: var(--border-secondary); }
 .flag-maybe { color: var(--link-color); border-color: var(--border-secondary); font-style: italic; }
 .flag-assumed { opacity: .85; border-style: dashed; }

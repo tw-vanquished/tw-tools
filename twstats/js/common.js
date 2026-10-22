@@ -52,10 +52,19 @@
   }
 
   var WD_FMT = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "short" });
-  function weekday(t) {       // "Lun", "Mar", … (Spanish, server tz)
-    var s = WD_FMT.format(new Date(t * 1000)).replace(/\.$/, "");
+  var WD_FMT_UTC = new Intl.DateTimeFormat("es-ES", { timeZone: "UTC", weekday: "short" });
+  function wdName(fmt, t) {
+    var s = fmt.format(new Date(t * 1000)).replace(/\.$/, "");
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
+  function weekday(t) { return wdName(WD_FMT, t); }   // "Lun", "Mar", … (Spanish, server tz)
+
+  // DAILY-bucket labels. build.py keeps the latest snapshot of each UTC day
+  // (typically 21:00-23:59Z = already tomorrow in Madrid), so a daily point is
+  // labelled by its UTC day — in Madrid time two buckets could share a date.
+  // Real moments (conquests, first seen, village changes) stay in Madrid.
+  function fmtDayUTC(t) { return new Date(t * 1000).toISOString().slice(0, 10); }  // "YYYY-MM-DD"
+  function weekdayUTC(t) { return wdName(WD_FMT_UTC, t); }
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
@@ -70,6 +79,23 @@
       if (!r.ok) throw new Error(name + ": HTTP " + r.status);
       return r.json();
     });
+  }
+
+  // players-archive.json (build.py: the players who left the world, with an
+  // archived page) as { id: row }, fetched once per page. Resolves null when
+  // the file is missing (data built before it) or unreadable, so callers
+  // simply render without it.
+  var playerArchiveP = null;
+  function playerArchive() {
+    if (!playerArchiveP) {
+      playerArchiveP = loadJSON("players-archive.json").then(function (rows) {
+        if (!Array.isArray(rows)) return null;
+        var map = {};
+        for (var i = 0; i < rows.length; i++) map[rows[i].id] = rows[i];
+        return map;
+      }, function () { return null; });
+    }
+    return playerArchiveP;
   }
 
   // --- internal navigation links (to our own profile pages) ---
@@ -92,11 +118,19 @@
     var loc = ' <span class="coord">(' + v.x + "|" + v.y + ')</span> <span class="cont">' + continent(v.x, v.y) + "</span>";
     return '<a href="village.html?id=' + encodeURIComponent(v.id) + '">' + name + "</a>" + loc;
   }
-  function ownerCell(o) {
+  // `arch` (optional, from playerArchive()): an owner who left the world but
+  // has an archived page links to player.html (the game's page is gone) under
+  // the name the archive knows, instead of a bare '— (id X)'.
+  function ownerCell(o, arch) {
     if (!o) return '<span class="barb">Bárbaro</span>';
-    if (!o.name) return '<span class="gone">— (id ' + esc(o.id) + ")</span>";
-    var out = '<a class="playerlink" href="' + GAME + "info_player&id=" + esc(o.id) +
-      '" target="_blank" rel="noopener">' + esc(o.name) + "</a>";
+    var a = arch && o.id != null ? arch[o.id] : null;
+    if (!o.name && !a) return '<span class="gone">— (id ' + esc(o.id) + ")</span>";
+    var out = a
+      ? '<a class="playerlink" href="player.html?id=' + encodeURIComponent(o.id) +
+        '" title="Archivado — visto por última vez ' + fmtDayUTC(a.lastSeen) + '">' + esc(o.name || a.name) +
+        '</a> <span class="gone">(archivado)</span>'
+      : '<a class="playerlink" href="' + GAME + "info_player&id=" + esc(o.id) +
+        '" target="_blank" rel="noopener">' + esc(o.name) + "</a>";
     if (o.tribe) {
       out += ' <span class="tribe-br">[<a class="tribelink" href="' + GAME + "info_ally&id=" +
         esc(o.tribe.id) + '" target="_blank" rel="noopener">' + esc(o.tribe.tag) + "</a>]</span>";
@@ -150,13 +184,37 @@
   }
 
   // Compact duration for the village "Tiempo" column: "45m", "2h", "3d 4h".
+  // Rounds ONCE at the output unit, then splits — so 59m50s is "1h" (not
+  // "60m"), 23h50m is "1d" and 1d 23h40m is "2d" (not "24h" / "1d 24h").
   function dur(seconds) {
     var s = Math.max(0, Math.round(seconds));
-    if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m";
-    if (s < 86400) return Math.round(s / 3600) + "h";
-    var d = Math.floor(s / 86400);
-    var h = Math.round((s % 86400) / 3600);
+    if (s < 3570) return Math.max(1, Math.round(s / 60)) + "m";
+    var hrs = Math.round(s / 3600);
+    if (hrs < 24) return hrs + "h";
+    var d = Math.floor(hrs / 24), h = hrs % 24;
     return h ? d + "d " + h + "h" : d + "d";
+  }
+
+  // Paged table: `size` rows of a list per page into <tbody> `body`, rendered
+  // by rowsHtml(slice) — which must also return the "empty" row for []. The
+  // `pager` element holds [data-pg=prev|info|next] and hides itself when the
+  // list fits on one page. Returns { set(list) } (back to page 1).
+  function pagedTable(body, pager, size, rowsHtml) {
+    var st = { list: [], page: 0 };
+    var q = function (w) { return pager.querySelector('[data-pg="' + w + '"]'); };
+    function render() {
+      var total = st.list.length, pages = Math.max(1, Math.ceil(total / size));
+      st.page = Math.max(0, Math.min(st.page, pages - 1));
+      var start = st.page * size;
+      body.innerHTML = rowsHtml(st.list.slice(start, start + size));
+      q("info").textContent = (start + 1) + "–" + Math.min(start + size, total) + " de " + commas(total);
+      q("prev").disabled = st.page <= 0;
+      q("next").disabled = st.page >= pages - 1;
+      pager.hidden = pages <= 1;
+    }
+    q("prev").addEventListener("click", function () { st.page--; render(); });
+    q("next").addEventListener("click", function () { st.page++; render(); });
+    return { set: function (list) { st.list = list || []; st.page = 0; render(); } };
   }
 
   // Wire twstats-style tabs: [data-tab] buttons toggle sibling [data-panel]
@@ -260,11 +318,12 @@
     WORLD: WORLD, DATA: DATA, GAME: GAME, SRV_FMT: SRV_FMT,
     apiFetch: apiFetch,
     fmtTime: fmtTime, fmtStamp: fmtStamp, fmtDate: fmtDate, fmtDateTime: fmtDateTime, weekday: weekday,
+    fmtDayUTC: fmtDayUTC, weekdayUTC: weekdayUTC,
     srvEpoch: srvEpoch,
-    esc: esc, commas: commas, continent: continent, loadJSON: loadJSON,
+    esc: esc, commas: commas, continent: continent, loadJSON: loadJSON, playerArchive: playerArchive,
     playerLink: playerLink, tribeLink: tribeLink,
     villageCell: villageCell, ownerCell: ownerCell, deltaCell: deltaCell,
-    changeCell: changeCell, relTime: relTime, dur: dur, initTabs: initTabs,
+    changeCell: changeCell, relTime: relTime, dur: dur, initTabs: initTabs, pagedTable: pagedTable,
     renderNav: renderNav,
   };
 })();

@@ -30,9 +30,24 @@ function openAutoGenerate() {
     container.innerHTML = `<em style="color:#5a3a18">${t('ag_no_nobles')}</em>`;
   }
   document.getElementById('ag-divided-off-all').checked = false;
+  const esc = nobleEscortSetting();
+  document.getElementById('ag-escort-axe').value = esc.axe;
+  document.getElementById('ag-escort-lc').value  = esc.light;
 
   updateAutoGenPreview();
   openModal('modal-autogen');
+}
+
+// The per-noble escort of a village that also sends its own off (see escortFor). Saved at once and
+// read when each link is built, so it also re-shapes the links of an already generated plan.
+function setNobleEscort() {
+  DATA.settings.nobleEscortAxe = Math.max(0, Math.floor(+document.getElementById('ag-escort-axe').value) || 0);
+  DATA.settings.nobleEscortLc  = Math.max(0, Math.floor(+document.getElementById('ag-escort-lc').value) || 0);
+  const esc = nobleEscortSetting();
+  document.getElementById('ag-escort-axe').value = esc.axe;
+  document.getElementById('ag-escort-lc').value  = esc.light;
+  saveData();
+  renderAttacks();
 }
 
 function toggleAllDividedOff(checked) {
@@ -64,20 +79,20 @@ function updateAutoGenPreview() {
   const fakeEst      = Math.min(fakeTargets2, fakeSlots);
 
   const nameNote = myName
-    ? `Filtering to player <strong>${escHtml(DATA.settings.playerName)}</strong>`
-    : `<span style="color:#c06030">⚠ No player name set — all requirements will be assigned</span>`;
+    ? t('ag_preview_player').replace('{name}', escHtml(DATA.settings.playerName))
+    : `<span style="color:#c06030">${t('ag_preview_no_player')}</span>`;
 
-  const pinnedPart = pinnedFakes ? ` · <strong>${pinnedFakes}</strong> pinned fake(s)` : '';
+  const pinnedPart = pinnedFakes ? ' · ' + t('ag_preview_pinned_fakes').replace('{n}', pinnedFakes) : '';
   const fakePart = pinnedPart + (includeFakes
-    ? ` · up to <strong>${fakeEst}</strong> extra fakes across ${DATA.villages.length} village(s)`
-    : (pinnedFakes ? '' : ` · <span style="color:#806838">fakes disabled</span>`));
+    ? ' · ' + t('ag_preview_extra_fakes').replace('{n}', fakeEst).replace('{v}', DATA.villages.length)
+    : (pinnedFakes ? '' : ` · <span style="color:#806838">${t('ag_preview_fakes_off')}</span>`));
 
   document.getElementById('ag-preview').innerHTML =
     `${nameNote}<br>` +
-    `Expected: <strong>${offCount}</strong> off(s) · <strong>${snobCount}</strong> snob train(s)${fakePart}`;
+    t('ag_preview_expected').replace('{offs}', offCount).replace('{snobs}', snobCount) + fakePart;
 }
 
-function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance: true, window: false }, includeFakes = true, dividedOffVillages = new Set()) {
+function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance: true, window: false }, includeFakes = true, dividedOffVillages = new Set(), sentRows = []) {
   const myName = (DATA.settings.playerName || '').trim().toLowerCase();
 
   function myReqs(target) {
@@ -86,9 +101,11 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   }
 
   // A requirement lands on its OWN date when the import stamped one (multi-date plan);
-  // the modal's landing date covers everything else.
+  // the modal's landing date covers everything else. A short or garbage time saved before
+  // times were normalized ('2:00', 'abc') falls back to the default instead of throwing.
   function landingISO(timeStr, dateISO) {
-    return new Date(`${dateISO || landingDateStr}T${timeStr || '02:00'}:00`).toISOString();
+    const hm = normHHMM(timeStr) || normHHMM(defaultTime) || '02:00';
+    return new Date(`${dateISO || landingDateStr}T${hm}:00`).toISOString();
   }
 
   const offTargets  = DATA.targets.filter(t => t.targetType === 'off');
@@ -99,6 +116,34 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   DATA.villages.forEach(v => {
     vs[v.id] = { noblesLeft: v.nobles || 0, catsLeft: v.cats || 0, usedForOff: false, fakeCount: 0 };
   });
+
+  // Rows already marked Sent survive a re-run (runAutoGenerate keeps them): their troops are
+  // out, and the requirement each one fulfils must not be generated again. A sent row covers
+  // one requirement: same target, a matching troop kind (REPLACE_REQ_UNITS), same window start
+  // and landing time — and for a pinned requirement the same origin village. A generated off
+  // row also carries reqUnit (ram = full off, axe = 3/4 off), so a sent 3/4 off never covers the
+  // full off of the same window; rows saved before the stamp keep the loose ram/axe match.
+  // Its nobles / catapults come off the village's counts only when those predate the send:
+  // counts imported after ✓ Sent (troopsAt ≥ sentAt) already lack them. No stamp = subtract.
+  const sentPool = sentRows.filter(a => a.fromId && a.type !== 'unassigned');
+  sentPool.forEach(a => {
+    const s = vs[a.fromId];
+    if (!s) return;
+    const v = DATA.villages.find(x => x.id === a.fromId);
+    const inCounts = !(a.sentAt && v.troopsAt && a.sentAt <= v.troopsAt);
+    if (a.type === 'off') s.usedForOff = true;
+    else if (a.type === 'snob') { if (inCounts) s.noblesLeft = Math.max(0, s.noblesLeft - (a.nobleCount || 0)); s.usedForSnob = true; }
+    else if (a.type === 'catapult') { if (inCounts) s.catsLeft = Math.max(0, s.catsLeft - (a.catCount || s.catsLeft)); }
+    else if (a.type === 'fake') s.fakeCount++;
+  });
+  function coveredBySent(target, req, iso, fromId) {
+    const i = sentPool.findIndex(a => a.targetId === target.id && a.landingTime === iso
+      && (REPLACE_REQ_UNITS[a.type] || []).includes(req.unitType)
+      && (a.type !== 'off' || !a.reqUnit || a.reqUnit === req.unitType)   // stamp only binds an off row (Edit can re-type it)
+      && (a.windowFrom || '') === (req.timeFrom || '') && (!fromId || a.fromId === fromId));
+    if (i < 0) return null;
+    return sentPool.splice(i, 1)[0];   // the covering row (a partial snob train leaves a shortfall)
+  }
 
   const attacks = [];
 
@@ -111,9 +156,12 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   function resolvePinned(req) {
     if (!req.srcCoord) return null;
     const [sx, sy] = req.srcCoord.split('|').map(Number);
-    const vid = req.srcVillageId || '';
-    let v = (vid && DATA.villages.find(v => String(v.villageId) === String(vid)))
-         || DATA.villages.find(v => v.x === sx && v.y === sy);
+    let vid = req.srcVillageId || '';
+    // Village coords never change: an ID match somewhere else is a stale pin (origin edited) —
+    // the coords win and the old ID is not carried onto a stub.
+    let byId = vid && DATA.villages.find(v => String(v.villageId) === String(vid));
+    if (byId && (byId.x !== sx || byId.y !== sy)) { byId = null; vid = ''; }
+    let v = byId || DATA.villages.find(v => v.x === sx && v.y === sy);
     if (!v) {
       v = { id: uid(), name: `(${sx}|${sy})`, villageId: vid || '', x: sx, y: sy, axes: 0, lc: 0, rams: 0, cats: 0, nobles: 0 };
       DATA.villages.push(v);
@@ -128,15 +176,18 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   // Pinned pass runs over BOTH off and fake targets: a FAKE target's requirements (from
   // tribe-calculator's per-player export) each name an exact origin, just like an off. Fakes
   // pinned here are tracked so the bulk "include fakes" spray below never doubles them.
-  const pinnedFakeTargets = new Set();
+  // A target whose fake is already sent (kept row) is also left out of the spray.
+  const pinnedFakeTargets = new Set(sentRows.filter(a => a.type === 'fake').map(a => a.targetId));
   [...offTargets, ...fakeTargets].forEach(target => {
     myReqs(target).forEach(req => {
       const v = resolvePinned(req);
       if (!v) return;   // not pinned → handled by the assignment passes / fake spray below
       const iso = landingISO(req.timeFrom || defaultTime, req.dateISO);
+      if (coveredBySent(target, req, iso, v.id)) return;   // already sent from this village
       if (req.unitType === 'snob') {
         const nc = Math.max(1, req.count || 4);
         vs[v.id].noblesLeft = Math.max(0, vs[v.id].noblesLeft - nc);
+        vs[v.id].usedForSnob = true;   // same as an unpinned train: catapults look elsewhere first
         attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'snob', nobleCount: nc, landingTime: iso, windowFrom: req.timeFrom, windowTo: req.timeTo, dividedOff: dividedOffVillages.has(v.id), sent: false });
       } else if (req.unitType === 'fake') {
         // Explicit fake assignment (1 spy + 1 ram) from the planned village at its window —
@@ -155,7 +206,9 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
       } else {
         // building = the Catapult Mode "(→ Building)" objective imported with the requirement
         // (undefined otherwise — JSON drops it), shown as the attack row's Building column.
-        attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'off', nobleCount: 1, landingTime: iso, windowFrom: req.timeFrom, windowTo: req.timeTo, building: req.building, sent: false });
+        // The pinned village's off is spent: the unpinned off assignment must not pick it again.
+        vs[v.id].usedForOff = true;
+        attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'off', reqUnit: req.unitType, nobleCount: 1, landingTime: iso, windowFrom: req.timeFrom, windowTo: req.timeTo, building: req.building, sent: false });
       }
     });
   });
@@ -168,14 +221,27 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
     snobLines.forEach(req => {
       const iso = landingISO(req.timeFrom || defaultTime, req.dateISO);
       const wf = req.timeFrom, wt = req.timeTo;
-      const v = DATA.villages
-        .filter(v => vs[v.id].noblesLeft > 0)
+      const want = req.count || 4;
+      // A sent train covers the requirement; a sent PARTIAL train keeps its missing nobles as
+      // an Unassigned row (×rest), same as when it was generated.
+      const sent = coveredBySent(target, req, iso);
+      if (sent) {
+        const rest = want - (sent.nobleCount || 0);
+        if (rest > 0) missedSnobs.push({ targetId: target.id, unitType: 'snob', iso, windowFrom: wf, windowTo: wt, nobleCount: rest });
+        return;
+      }
+      // A village holding the WHOLE train first (closest, or most nobles); only when none does,
+      // the biggest partial train — its missing nobles become an Unassigned row (×shortfall).
+      const withNobles = DATA.villages.filter(v => vs[v.id].noblesLeft > 0);
+      const v = withNobles.filter(v => vs[v.id].noblesLeft >= want)
         .sort(criteria.distance
           ? (a, b) => dist(a, target) - dist(b, target)
           : (a, b) => vs[b.id].noblesLeft - vs[a.id].noblesLeft
-        )[0];
+        )[0]
+        || withNobles.sort((a, b) => vs[b.id].noblesLeft - vs[a.id].noblesLeft || dist(a, target) - dist(b, target))[0];
       if (!v) { missedSnobs.push({ targetId: target.id, unitType: 'snob', iso, windowFrom: wf, windowTo: wt }); return; }
-      const nc = Math.min(req.count || 4, vs[v.id].noblesLeft);
+      const nc = Math.min(want, vs[v.id].noblesLeft);
+      if (nc < want) missedSnobs.push({ targetId: target.id, unitType: 'snob', iso, windowFrom: wf, windowTo: wt, nobleCount: want - nc });
       vs[v.id].noblesLeft  -= nc;
       vs[v.id].usedForSnob  = true;
       attacks.push({ id: uid(), fromId: v.id, targetId: target.id, type: 'snob', nobleCount: nc, landingTime: iso, windowFrom: wf, windowTo: wt, dividedOff: dividedOffVillages.has(v.id), sent: false });
@@ -187,10 +253,12 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   offTargets.forEach(target => {
     myReqs(target).filter(r => r.unitType === 'ram' && !r.srcCoord).forEach(r => {
       const iso = landingISO(r.timeFrom || defaultTime, r.dateISO);
+      if (coveredBySent(target, r, iso)) return;
       offNeeds.push({ target, iso, windowFrom: r.timeFrom, windowTo: r.timeTo, building: r.building, minPow: TIER.tq, fallbackPow: TIER.half, unitType: 'off' });
     });
     myReqs(target).filter(r => r.unitType === 'axe' && !r.srcCoord).forEach(r => {
       const iso = landingISO(r.timeFrom || defaultTime, r.dateISO);
+      if (coveredBySent(target, r, iso)) return;
       offNeeds.push({ target, iso, windowFrom: r.timeFrom, windowTo: r.timeTo, building: r.building, minPow: TIER.half, fallbackPow: TIER.half, unitType: 'axe' });
     });
   });
@@ -199,7 +267,7 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   const offAssignments = assignOffsComposite(offNeeds, vs, criteria, dividedOffVillages);
 
   offAssignments.forEach(({ v, need }) => {
-    attacks.push({ id: uid(), fromId: v.id, targetId: need.target.id, type: 'off', nobleCount: 1, landingTime: need.iso, windowFrom: need.windowFrom, windowTo: need.windowTo, building: need.building, sent: false });
+    attacks.push({ id: uid(), fromId: v.id, targetId: need.target.id, type: 'off', reqUnit: need.unitType === 'axe' ? 'axe' : 'ram', nobleCount: 1, landingTime: need.iso, windowFrom: need.windowFrom, windowTo: need.windowTo, building: need.building, sent: false });
   });
 
   const assignedNeeds = new Set(offAssignments.map(a => a.need));
@@ -216,6 +284,7 @@ function autoGenerateAttacks(landingDateStr, criteria = { power: true, distance:
   offTargets.forEach(target => {
     myReqs(target).filter(r => r.unitType === 'catapult' && !r.srcCoord).forEach(req => {
       const iso = landingISO(req.timeFrom || defaultTime, req.dateISO);
+      if (coveredBySent(target, req, iso)) return;
       const cc  = req.count > 1 ? req.count : 0;
       const byPref = criteria.distance
         ? (a, b) => dist(a, target) - dist(b, target)
@@ -287,12 +356,13 @@ function assignOffsComposite(needs, vs, criteria, dividedOffVillages = new Set()
         s += Math.max(0, 1 - d / 200) * 100;
       }
 
-      if (criteria.window && need.windowFrom && need.windowTo) {
+      const wFrom = normHHMM(need.windowFrom), wTo = normHHMM(need.windowTo);
+      if (criteria.window && wFrom && wTo) {
         const tMs    = travelMs(d, 'off', ws, us);
         const sendMs = new Date(need.iso).getTime() - tMs;
         const base   = need.iso.slice(0, 10); // YYYY-MM-DD
-        const fromMs = new Date(`${base}T${need.windowFrom}:00`).getTime();
-        const toMs   = new Date(`${base}T${need.windowTo}:00`).getTime();
+        const fromMs = new Date(`${base}T${wFrom}:00`).getTime();
+        const toMs   = new Date(`${base}T${wTo}:00`).getTime();
         const midMs  = (fromMs + toMs) / 2;
         const span   = Math.max(toMs - fromMs, 1800000);
         s += Math.max(0, 1 - Math.abs(sendMs - midMs) / (span * 4)) * 1;
@@ -447,21 +517,30 @@ function runAutoGenerate() {
     [...document.querySelectorAll('.ag-dov-cb:checked')].map(cb => cb.dataset.vid)
   );
 
-  const { attacks, missedSnobs, missedOffs, missedCats } = autoGenerateAttacks(dateStr, criteria, includeFakes, dividedOffVillages);
+  // Generated rows already marked Sent stay (their troops are out) and cover their requirement.
+  const sentRows = DATA.attacks.filter(a => a.sent && !a.manual && a.fromId && a.type !== 'unassigned');
+
+  // A bad saved value must not abort silently with the modal still open: say so, change nothing.
+  let gen;
+  try { gen = autoGenerateAttacks(dateStr, criteria, includeFakes, dividedOffVillages, sentRows); }
+  catch (err) { alert(t('alert_autogen_failed').replace('{msg}', err && err.message || String(err))); return; }
+  const { attacks, missedSnobs, missedOffs, missedCats } = gen;
   const unassigned = [
-    ...missedSnobs.map(m => ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, sent: false })),
+    // nobleCount only on a partial train's shortfall row (undefined = the whole train is missing)
+    ...missedSnobs.map(m => ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, nobleCount: m.nobleCount, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, sent: false })),
     ...missedOffs.map(m =>  ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, building: m.building, sent: false })),
     ...missedCats.map(m =>  ({ id: uid(), fromId: null, targetId: m.targetId, type: 'unassigned', unitType: m.unitType, landingTime: m.iso, windowFrom: m.windowFrom, windowTo: m.windowTo, building: m.building, sent: false })),
   ];
 
-  if (!attacks.length && !unassigned.length) {
+  if (!attacks.length && !unassigned.length && !sentRows.length) {
     alert(t('alert_no_attacks_generated'));
     return;
   }
 
   // Replace any previously generated attacks (re-generating is the common action; appending
-  // would stack duplicates). Manual one-off attacks are preserved.
-  DATA.attacks = DATA.attacks.filter(a => a.manual);
+  // would stack duplicates). Manual one-off attacks and sent generated rows are preserved.
+  const kept = new Set(sentRows);
+  DATA.attacks = DATA.attacks.filter(a => a.manual || kept.has(a));
   DATA.attacks.push(...attacks, ...unassigned);
   saveData();
   if (typeof cloudSyncPlan === 'function') cloudSyncPlan(); // hosted-site: cloud-save on plan generated
@@ -483,6 +562,7 @@ function runAutoGenerate() {
   if (unassigned.length) {
     msg += t('alert_generated_unassigned').replace('{n}', unassigned.length);
   }
+  if (sentRows.length) msg += t('alert_generated_sent_kept').replace('{n}', sentRows.length);
   alert(msg);
 }
 

@@ -21,9 +21,11 @@
   }
 
   // Core geometry + SVG builder. Returns { svg, coords:[{px,py,t,v}], geom }.
-  // opts: {width, height, invert, timeX, color, label, interactive}.
+  // opts: {width, height, invert, timeX, daily, color, label, interactive}.
+  // daily: the points are daily buckets (UTC days) → date labels use fmtDayUTC.
   function buildChart(points, opts) {
     opts = opts || {};
+    var dayLabel = opts.daily ? TW.fmtDayUTC : TW.fmtDate;
     var W = opts.width || 600, H = opts.height || 150;
     var invert = !!opts.invert;
     var color = opts.color || "var(--link-color)";
@@ -90,10 +92,10 @@
     }
 
     svg += '<text x="' + padL + '" y="' + (H - 6) + '" class="chart-dlabel">' +
-      TW.fmtDate(points[0].t) + "</text>";
+      dayLabel(points[0].t) + "</text>";
     if (n > 1) {
       svg += '<text x="' + (padL + plotW) + '" y="' + (H - 6) +
-        '" text-anchor="end" class="chart-dlabel">' + TW.fmtDate(points[n - 1].t) + "</text>";
+        '" text-anchor="end" class="chart-dlabel">' + dayLabel(points[n - 1].t) + "</text>";
     }
 
     if (opts.interactive) {
@@ -113,7 +115,7 @@
   }
 
   // Interactive metric chart. `metrics` = [{key, label, invert}]; first active.
-  // opts: {width, height, timeX, color}. Village passes a single-metric array
+  // opts: {width, height, timeX, daily, color}. Village passes a single-metric array
   // (no toggle bar rendered). Hover shows crosshair + dot + tooltip.
   function metricChart(mount, series, metrics, opts) {
     opts = opts || {};
@@ -157,7 +159,7 @@
       for (var b = 0; b < buttons.length; b++) buttons[b].classList.toggle("active", b === idx);
       var m = metrics[idx];
       var built = buildChart(seriesPoints(series, m.key), {
-        width: W, height: H, invert: m.invert, timeX: opts.timeX,
+        width: W, height: H, invert: m.invert, timeX: opts.timeX, daily: opts.daily,
         color: opts.color, label: m.label, interactive: true,
       });
       var old = holder.querySelector("svg");
@@ -199,7 +201,7 @@
         cur.dot.setAttribute("cy", c.py.toFixed(1));
         cur.dot.style.display = "";
       }
-      var when = opts.timeX ? TW.fmtDateTime(c.t) : TW.fmtDate(c.t);
+      var when = opts.daily ? TW.fmtDayUTC(c.t) : opts.timeX ? TW.fmtDateTime(c.t) : TW.fmtDate(c.t);
       tip.innerHTML = '<span class="tip-date">' + when + '</span>' +
         '<span class="tip-val">' + TW.esc(cur.metric.label) + ": " + TW.commas(c.v) + "</span>";
       tip.hidden = false;

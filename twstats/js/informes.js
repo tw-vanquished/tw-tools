@@ -73,28 +73,49 @@
   }
 
   // Read + parse the chosen files AND the pasted JSON (2026-08-06) into one
-  // record array (shared by Subir/Ver). Returns null only when NEITHER source
+  // record array (shared by Subir/Ver). Resolves null only when NEITHER source
   // has anything — a paste alone is a full-fledged input, like the calculator's.
+  // Otherwise { records, bad }: `bad` names every file that is not JSON (and
+  // bad.paste is set when the pasted text is not), so the status line never
+  // lets a skipped input pass unmentioned.
   function readChosen() {
     var input = $("repFiles");
     var files = input && input.files ? [].slice.call(input.files) : [];
     var pasted = ($("repPaste") && $("repPaste").value.trim()) || "";
     if (!files.length && !pasted) return Promise.resolve(null);
     return Promise.all(files.map(function (f) { return f.text(); })).then(function (texts) {
-      var all = [];
+      var all = [], bad = [];
+      var names = files.map(function (f) { return f.name; });
       if (pasted) texts = texts.concat([pasted]);
-      texts.forEach(function (t) {
-        try { var d = JSON.parse(t); all = all.concat(Array.isArray(d) ? d : [d]); } catch (e) {}
+      texts.forEach(function (t, i) {
+        try { var d = JSON.parse(t); all = all.concat(Array.isArray(d) ? d : [d]); }
+        catch (e) { if (i < names.length) bad.push(names[i]); else bad.paste = true; }
       });
-      return all;
+      return { records: all, bad: bad };
     });
   }
+  // The paste is not a file: it gets its own wording, not «archivo ilegible».
+  function badNote(bad) {
+    return (bad.length
+      ? " · " + bad.length + " archivo" + (bad.length === 1 ? "" : "s") + " ilegible" +
+        (bad.length === 1 ? "" : "s") + ": " + bad.join(", ")
+      : "") + (bad.paste ? " · el texto pegado no es JSON válido" : "");
+  }
 
+  // One upload at a time: a second click would start a second Turnstile run
+  // that takes over the single pending slot and leaves the first one hanging.
+  var uploading = false;
   function repUpload() {
-    var input = $("repFiles"), out = $("repStatus");
-    readChosen().then(function (all) {
-      if (all === null) { out.textContent = "Elige uno o más tw-reports-*.json (o pega el JSON) primero."; return; }
-      if (!all.length) { out.textContent = "Ningún JSON válido — exporta con reportsExport.js."; return; }
+    var input = $("repFiles"), out = $("repStatus"), btn = $("repUpload");
+    if (uploading) return;
+    uploading = true;
+    btn.disabled = true;
+    var bad = [];
+    readChosen().then(function (chosen) {
+      if (chosen === null) { out.textContent = "Elige uno o más tw-reports-*.json (o pega el JSON) primero."; return; }
+      var all = chosen.records;
+      bad = chosen.bad;
+      if (!all.length) { out.textContent = "Ningún JSON válido — exporta con reportsExport.js." + badNote(bad); return; }
       out.textContent = "Verificando navegador…";
       return repGuardToken().then(function (token) {
         if (!token) { out.textContent = "No se pudo verificar el navegador — inténtalo de nuevo."; return; }
@@ -104,10 +125,16 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: "twstats", content: JSON.stringify(all), token: token,
                                  kind: "reports", ext: "json", world: "es103" }),
-        }).then(function (r) { return r.json(); }).then(function (res) {
+        }).then(function (r) {
+          // An error page that is not JSON (413 / 5xx from the edge) reads as
+          // its HTTP status; a JSON error body from the Worker keeps its text.
+          return r.json().then(null, function () { return null; }).then(function (res) {
+            return (r.ok || (res && res.error)) ? res : { error: "HTTP " + r.status };
+          });
+        }).then(function (res) {
           if (res && res.ok && res.db && !res.db.error) {
             out.textContent = "✔ +" + res.db.added + " nuevos, " + res.db.dupes +
-              " duplicados — la BD cubre " + res.db.villages + " pueblos.";
+              " duplicados — la BD cubre " + res.db.villages + " pueblos." + badNote(bad);
             input.value = "";
             if ($("repPaste")) $("repPaste").value = "";
             loadDbStats();
@@ -116,7 +143,8 @@
           out.textContent = "Error al subir" + (res && res.error ? ": " + res.error : ".");
         });
       });
-    }).catch(function (e) { out.textContent = "Error: " + e.message; });
+    }).catch(function (e) { out.textContent = "Error: " + e.message; })
+      .then(function () { uploading = false; btn.disabled = false; });
   }
 
   // === local viewer ("Ver") ================================================
@@ -126,13 +154,13 @@
   var viewRecords = [];
   function repView() {
     var out = $("repStatus");
-    readChosen().then(function (all) {
-      if (all === null) { out.textContent = "Elige uno o más tw-reports-*.json (o pega el JSON) primero."; return; }
-      var recs = all.filter(function (r) { return r && typeof r === "object" && r.reportTimestamp; });
-      if (!recs.length) { out.textContent = "Ningún JSON válido — exporta con reportsExport.js."; return; }
+    readChosen().then(function (chosen) {
+      if (chosen === null) { out.textContent = "Elige uno o más tw-reports-*.json (o pega el JSON) primero."; return; }
+      var recs = chosen.records.filter(function (r) { return r && typeof r === "object" && r.reportTimestamp; });
+      if (!recs.length) { out.textContent = "Ningún JSON válido — exporta con reportsExport.js." + badNote(chosen.bad); return; }
       recs.sort(function (a, b) { return (b.reportTimestamp || 0) - (a.reportTimestamp || 0); });
       viewRecords = recs;
-      out.textContent = "";
+      out.textContent = badNote(chosen.bad).replace(/^ · /, "");
       $("viewerLine").textContent = recs.length + " informes — pulsa uno para verlo como en el juego.";
       $("viewerList").innerHTML = recs.map(function (r, i) {
         return '<details class="twrr-item" data-i="' + i + '"><summary>' +

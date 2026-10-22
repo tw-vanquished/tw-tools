@@ -17,6 +17,8 @@ function loadData() {
       if (!Array.isArray(DATA.villages)) DATA.villages = [];
       if (!Array.isArray(DATA.targets))  DATA.targets  = [];
       if (!Array.isArray(DATA.attacks))  DATA.attacks  = [];
+      // targets added from the Village DB before it set a type had none → Off (the default)
+      DATA.targets.forEach(t => { if (t && !t.targetType) t.targetType = 'off'; });
       if (!DATA.settings) DATA.settings = { worldSpeed: 2, unitSpeed: 0.5, serverUrl: 'es103.guerrastribales.es' };
       if (DATA.settings.lang) { currentLang = DATA.settings.lang; }
     }
@@ -113,6 +115,7 @@ async function connectFile() {
       if (!Array.isArray(DATA.villages)) DATA.villages = [];
       if (!Array.isArray(DATA.targets))  DATA.targets  = [];
       if (!Array.isArray(DATA.attacks))  DATA.attacks  = [];
+      DATA.targets.forEach(t => { if (t && !t.targetType) t.targetType = 'off'; });   // as loadData
       if (typeof ensureScavengeState === 'function') ensureScavengeState();
       applySettings();
       renderAll();
@@ -167,6 +170,7 @@ function handleImport(e) {
       if (!Array.isArray(DATA.villages)) DATA.villages = [];
       if (!Array.isArray(DATA.targets))  DATA.targets  = [];
       if (!Array.isArray(DATA.attacks))  DATA.attacks  = [];
+      DATA.targets.forEach(t => { if (t && !t.targetType) t.targetType = 'off'; });   // as loadData
       applySettings();
       saveData();
       renderAll();
@@ -291,7 +295,7 @@ function renderDb(query) {
   const capped  = results.slice(0, 200);
   const countEl = document.getElementById('db-count');
   countEl.textContent = total > 200 ? t('db_showing').replace('{total}', total.toLocaleString()) :
-                        total > 0   ? `${total.toLocaleString()} results` : t('empty_no_results');
+                        total > 0   ? t('db_results').replace('{n}', total.toLocaleString()) : t('empty_no_results');
 
   const tbody = document.getElementById('db-tbody');
   if (capped.length === 0) {
@@ -306,7 +310,7 @@ function renderDb(query) {
       <td class="coords">${v.x}|${v.y}</td>
       <td>${player}</td>
       <td>${v.points.toLocaleString()}</td>
-      <td><button class="btn btn-primary btn-sm" onclick="addTargetFromDb('${escAttr(v.id)}')">+ Target</button></td>
+      <td><button class="btn btn-primary btn-sm" onclick="addTargetFromDb('${escAttr(v.id)}')">${t('db_btn_target')}</button></td>
     </tr>`;
   }).join('');
 }
@@ -325,7 +329,10 @@ function addTargetFromDb(dbId) {
     villageId: v.id,
     player:    playerMap[v.playerId] || '',
     x:         v.x,
-    y:         v.y
+    y:         v.y,
+    // Off by default, like the Add Target form — an untyped target is invisible to Auto-Generate
+    targetType:   'off',
+    requirements: []
   });
   saveData();
   renderTargets();

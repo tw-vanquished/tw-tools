@@ -11,11 +11,50 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t, i) => {
     const names = ['plan', 'villages', 'targets', 'scavenge', 'db', 'guide'];
     t.classList.toggle('active', names[i] === name);
+    t.setAttribute('aria-selected', names[i] === name ? 'true' : 'false');
   });
   document.querySelectorAll('.tab-content').forEach(tc => {
     tc.classList.remove('active');
   });
   document.getElementById('tab-' + name).classList.add('active');
+  // A narrow (scrolling) tab bar brings the opened tab into view — horizontally only, never
+  // moving the page; measured after the content swap (a page scrollbar may come or go).
+  const at = document.querySelector('.tab.active'), bar = at && at.parentElement;
+  if (bar && bar.clientWidth) {
+    const left = at.offsetLeft - bar.offsetLeft;  // both measured from <body>
+    if (left < bar.scrollLeft) bar.scrollLeft = Math.max(0, left - 8);
+    else if (left + at.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = left + at.offsetWidth - bar.clientWidth;
+  }
+  // Scavenging clocks (return times, 'probably back') are worked out at render: refresh on open.
+  if (name === 'scavenge' && typeof renderScavenge === 'function') renderScavenge();
+  try { localStorage.setItem(AP_TAB_KEY, name); } catch (e) { /* storage blocked: not remembered */ }
+}
+
+// The tabs are focusable <div>s: Enter / Space opens the focused one like a click.
+function tabKey(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  e.currentTarget.click();
+}
+
+// The bookmarklets run on the game page, so their alert texts are baked into the code.
+// bmLocalize swaps each exact English message literal (`pairs`: [literal, JS expression]) for
+// the current language; a literal no longer in the code simply stays English. bmStr gives a
+// JS string literal of a translation, '%' escaped (a javascript: URL is percent-decoded).
+function bmStr(key, prefix) {
+  return JSON.stringify((prefix || '') + t(key)).replace(/%/g, '\\u0025');
+}
+function bmLocalize(code, pairs) {
+  for (const [lit, expr] of pairs) code = code.split(lit).join(expr);
+  return code;
+}
+
+// Reopen the tab used last (a per-browser convenience; the plan itself lives in DATA).
+const AP_TAB_KEY = 'tw_attack_planner_tab';
+function restoreLastTab() {
+  let name = null;
+  try { name = localStorage.getItem(AP_TAB_KEY); } catch (e) { return; }
+  if (name && name !== 'plan' && document.getElementById('tab-' + name)) switchTab(name);
 }
 
 // ══════════════════════════════════════════════
@@ -92,6 +131,7 @@ function addVillage() {
     rams:        parseInt(document.getElementById('av-rams').value)        || 0,
     cats:        parseInt(document.getElementById('av-cats').value)        || 0,
     nobles:      parseInt(document.getElementById('av-nobles').value)      || 0,
+    troopsAt:    Date.now(),
   });
   // reset form
   ['av-name','av-vid','av-x','av-y'].forEach(id => document.getElementById(id).value = '');
@@ -124,6 +164,8 @@ function saveVillage() {
   const id = document.getElementById('mv-id').value;
   const v  = DATA.villages.find(v => v.id === id);
   if (!v) return;
+  const troopKeys = ['axes', 'lc', 'rams', 'cats', 'nobles'];
+  const troopsBefore = troopKeys.map(k => v[k] || 0).join();
   v.name       = document.getElementById('mv-name').value.trim();
   v.villageId  = document.getElementById('mv-vid').value.trim();
   v.x          = parseInt(document.getElementById('mv-x').value)           || 0;
@@ -133,6 +175,8 @@ function saveVillage() {
   v.rams       = parseInt(document.getElementById('mv-rams').value)        || 0;
   v.cats       = parseInt(document.getElementById('mv-cats').value)        || 0;
   v.nobles     = parseInt(document.getElementById('mv-nobles').value)      || 0;
+  // new counts typed in = a fresh snapshot (a rename alone keeps the import's stamp)
+  if (troopKeys.map(k => v[k]).join() !== troopsBefore) v.troopsAt = Date.now();
   closeModal('modal-village');
   saveData();
   renderVillages();
@@ -170,7 +214,7 @@ function renderVillages() {
       <td>${v.nobles||0}</td>
       <td>${pow.toLocaleString()} ${offTierBadge(pow)}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-edit btn-sm" onclick="editVillage('${v.id}')">✎ Edit</button>
+        <button class="btn btn-edit btn-sm" onclick="editVillage('${v.id}')">${t('btn_edit')}</button>
         <button class="btn btn-danger btn-sm" onclick="deleteVillage('${v.id}')">✕</button>
       </td>
     </tr>
@@ -230,7 +274,7 @@ function parseReqLines(text, attacker) {
     const unitType = (typeRaw === 'off' || typeRaw === 'ram' || typeRaw === 'complete') ? 'ram'
                    : (typeRaw === '1/2' || typeRaw === 'half' || typeRaw === 'axe')     ? 'axe'
                    : 'snob';
-    reqs.push({ unitType, attacker, timeFrom: m[2] || '', timeTo: m[3] || '' });
+    reqs.push({ unitType, attacker, timeFrom: normHHMM(m[2]), timeTo: normHHMM(m[3]) });
   }
   return reqs;
 }
@@ -334,8 +378,9 @@ function normalizeReqs(reqs, villages) {
       const out = {
         unitType: r.unitType,
         attacker: (r.attacker || '').trim(),
-        timeFrom: (r.timeFrom || '').trim(),
-        timeTo:   (r.timeTo || '').trim(),
+        // zero-padded HH:MM ('7:30' → '07:30'); a non-time ('abc', '25:00') is dropped
+        timeFrom: normHHMM(r.timeFrom),
+        timeTo:   normHHMM(r.timeTo),
       };
       // Per-requirement arrival date (multi-date plan imports / the editor's date field).
       // Kept only when it is a real, valid ISO date — Auto-Generate trusts it verbatim, and
@@ -354,9 +399,12 @@ function normalizeReqs(reqs, villages) {
       if (srcCoord) {
         out.srcCoord = srcCoord;
         const v = byCoord[srcCoord];
-        out.srcVillageId = v ? (v.villageId || '') : (r.srcVillageId || '');
+        // An origin changed in Edit Target (_src0 = the coord the row opened with) is a new
+        // sender: the old village ID and sitted-account id belong to the previous one.
+        const edited = '_src0' in r && srcCoord !== String(r._src0 || '').trim();
+        out.srcVillageId = v ? (v.villageId || '') : (edited ? '' : (r.srcVillageId || ''));
         // the sitted account's id from the plan import (v1.11.2) — no editor field, kept as is
-        if (/^\d+$/.test(String(r.srcT || ''))) out.srcT = String(r.srcT);
+        if (!edited && /^\d+$/.test(String(r.srcT || ''))) out.srcT = String(r.srcT);
       }
       return out;
     });
@@ -371,7 +419,9 @@ function editTarget(id) {
   document.getElementById('mt-name').value   = tg.name;
   document.getElementById('mt-vid').value    = tg.villageId || '';
   document.getElementById('mt-player').value = tg.player || '';
-  mtReqs = (tg.requirements || []).map(r => ({ ...r }));   // working copy — Cancel discards
+  document.getElementById('mt-type').value   = tg.targetType === 'fake' ? 'fake' : 'off';
+  // working copy — Cancel discards; _src0 lets normalizeReqs tell an edited origin coord apart
+  mtReqs = (tg.requirements || []).map(r => ({ ...r, _src0: r.srcCoord || '' }));
   renderMtReqs();
   openModal('modal-target');
 }
@@ -385,6 +435,8 @@ function saveTarget() {
   tg.name         = document.getElementById('mt-name').value.trim()   || `${tg.x}|${tg.y}`;
   tg.villageId    = document.getElementById('mt-vid').value.trim()    || '';
   tg.player       = document.getElementById('mt-player').value.trim() || '';
+  // Off / Fake; requirements are kept either way (pinned fake requirements live on fake targets)
+  tg.targetType   = document.getElementById('mt-type').value === 'fake' ? 'fake' : 'off';
   tg.requirements = normalizeReqs(mtReqs, DATA.villages);
   closeModal('modal-target');
   saveData();
@@ -429,7 +481,7 @@ function renderRequirements(reqs) {
     const time = win ? `<span style="font-family:monospace;color:#6090c0;font-size:10px"> ${escHtml(win)}</span>` : '';
     // Catapult Mode: the imported "(→ Building)" objective of this off's riding catapults.
     const bldg = r.building ? `<small style="color:#c08040;font-size:10px;font-weight:bold"> → ${escHtml(r.building)}</small>` : '';
-    const from = r.srcCoord ? `<small style="color:#6a7a4a;font-size:10px"> from ${escHtml(r.srcCoord)}</small>` : '';
+    const from = r.srcCoord ? `<small style="color:#6a7a4a;font-size:10px"> ${t('req_from')} ${escHtml(r.srcCoord)}</small>` : '';
     return `${cnt}${reqBadgeHtml(r.unitType)}<small style="color:#806838;font-size:10px"> ${escHtml(r.attacker)}</small>${time}${bldg}${from}`;
   }).join('<br>');
 }
@@ -440,23 +492,23 @@ function renderTargets() {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${t('empty_targets')}</td></tr>`;
     return;
   }
-  tbody.innerHTML = DATA.targets.map(t => {
-    const typeBadge = t.targetType === 'off'
-      ? `<span class="badge ttype-off">Off</span>`
-      : t.targetType === 'fake'
-        ? `<span class="badge ttype-fake">Fake</span>`
+  tbody.innerHTML = DATA.targets.map(tg => {
+    const typeBadge = tg.targetType === 'off'
+      ? `<span class="badge ttype-off">${t('opt_target_off')}</span>`
+      : tg.targetType === 'fake'
+        ? `<span class="badge ttype-fake">${t('opt_target_fake')}</span>`
         : `<span class="text-dim">—</span>`;
     return `
     <tr>
-      <td>${escHtml(t.name)}</td>
-      <td class="coords">${escHtml(t.villageId||'-')}</td>
-      <td class="coords">${t.x}|${t.y}</td>
-      <td>${escHtml(stripBB(t.player)||'-')}</td>
+      <td>${escHtml(tg.name)}</td>
+      <td class="coords">${escHtml(tg.villageId||'-')}</td>
+      <td class="coords">${tg.x}|${tg.y}</td>
+      <td>${escHtml(stripBB(tg.player)||'-')}</td>
       <td>${typeBadge}</td>
-      <td style="font-size:12px;line-height:1.6">${renderRequirements(t.requirements)}</td>
+      <td style="font-size:12px;line-height:1.6">${renderRequirements(tg.requirements)}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-edit btn-sm" onclick="editTarget('${t.id}')">✎ Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteTarget('${t.id}')">✕</button>
+        <button class="btn btn-edit btn-sm" onclick="editTarget('${tg.id}')">${t('btn_edit')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTarget('${tg.id}')">✕</button>
       </td>
     </tr>
   `;
