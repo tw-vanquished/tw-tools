@@ -45,24 +45,27 @@ function arrivalDaysOf(line) {
 
 function parseOffPlanBB(text) {
   const targets = [];        // plus non-JSON .arrivalDay / .arrivalDays, as parsePlayerPlanBB
-  // A target listed under several ARRIVAL DATE sections — a tribe-calculator plan with multiple
-  // OFF WINDOW GROUPS repeats its objective list once per wave — must ACCUMULATE every wave's
-  // requirements. Re-opening the same coord returns the existing entry instead of a fresh one,
-  // otherwise the last section would silently replace the earlier waves downstream (importOffTargets
-  // assigns `existing.requirements = p.requirements`).
+  // A target listed under several ARRIVAL DATE sections — tribe-calculator before v6.6.1
+  // repeated a multi-wave plan's objective list once per wave, and those posts still sit in
+  // forum threads — must ACCUMULATE every wave's requirements. Re-opening the same coord returns
+  // the existing entry instead of a fresh one, otherwise the last section would silently replace
+  // the earlier waves downstream (importOffTargets assigns `existing.requirements = p.requirements`).
   const byCoord = {};
   let current = null;
-  // Each wave's section opens with its own "ARRIVAL DATE: <weekday> <day>" header; its day
-  // dates the requirements listed under it (requirement.arrivalDay — importOffTargets resolves
-  // it like importPlayerPlan). Per SECTION, not per target: targets are interned across sections.
+  // Requirement day (requirement.arrivalDay — importOffTargets resolves it like importPlayerPlan):
+  // the line's own "<day> · " window prefix wins (v6.6.1+ posts list every wave of a target in
+  // one objective under ONE header that " & "-joins every date, and stamp each line when there
+  // are several — tribe-calculator planRowDayStamp, FORMAT CONTRACT); else the day of a
+  // single-date header above it (each pre-v6.6.1 wave section had its own). A line under a
+  // several-date header with no prefix stays undated rather than taking the first day.
   let sectionDay = null;
   const arrivalDays = [];
   for (const raw of text.split('\n')) {
     const line = raw.trim();
     const days = arrivalDaysOf(line);
     if (days) {
-      sectionDay = days.length ? days[0] : null;   // an unreadable header must not inherit the last wave's day
-      if (sectionDay !== null && !arrivalDays.includes(sectionDay)) arrivalDays.push(sectionDay);
+      sectionDay = days.length === 1 ? days[0] : null;   // an unreadable header must not inherit the last wave's day
+      days.forEach(d => { if (!arrivalDays.includes(d)) arrivalDays.push(d); });
       current = null;
       continue;
     }
@@ -100,7 +103,11 @@ function parseOffPlanBB(text) {
       // Catapult Mode: the off row's "(→ Building)" objective for its riding catapults.
       const building = buildingLabelOf(line);
       if (building) req.building = building;
-      if (sectionDay !== null) req.arrivalDay = sectionDay;
+      // The "·" is what keeps a digit in a building label from ever reading as a day; tags are
+      // stripped first so [color=…] hexes can't interfere.
+      const dm = line.slice(line.indexOf('[/player]')).replace(/\[[^\]]*\]/g, ' ').match(/(\d{1,2})\s*·\s*\d{1,2}:\d{2}/);
+      const day = dm ? parseInt(dm[1], 10) : sectionDay;
+      if (day !== null) req.arrivalDay = day;
       current.requirements.push(req);
     }
   }
@@ -468,7 +475,7 @@ function importOffTargets() {
   if (looksLikePlayerPlan(text)) { importPlayerPlan(text); return; }
   const parsed = parseOffPlanBB(text);
   if (!parsed.length) { alert(t('alert_no_targets_found')); return; }
-  // Each wave section's ARRIVAL DATE dates its requirements, exactly as in importPlayerPlan.
+  // Each requirement's day ("<day> · " prefix, else a single-date header) resolves exactly as in importPlayerPlan.
   const dates = resolveArrivalDates(parsed);
   if (dates.planDateISO) DATA.settings.planDateISO = dates.planDateISO;
   let added = 0, updated = 0, cats = 0;
